@@ -1,0 +1,121 @@
+# 太极空间 · 会员课程管理系统
+
+面向太极/健身场馆的 Web toB 管理后台，提供会员全生命周期管理、会员卡资产管理、课程创建/排期/预约/评价、教师管理、运营数据分析与系统配置能力。
+
+> 详细系统设计见 [prd.md](./prd.md)
+
+## 技术栈
+
+| 层 | 技术 |
+| --- | --- |
+| 框架 | Nuxt 4（Vue 3.5 + vue-router 5，SPA 管理后台模式） |
+| UI | Element Plus 2.14（@element-plus/nuxt 自动按需引入） |
+| 认证 | @sidebase/nuxt-auth（local provider）+ jsonwebtoken + bcryptjs |
+| ORM | Prisma 7（@prisma/client + @prisma/adapter-pg 驱动适配器） |
+| 数据库 | PostgreSQL（pg 连接池） |
+| 校验 | zod 4（服务端 API 入参统一校验） |
+
+## 环境要求
+
+- **Node.js v26.4.0**（推荐通过 nvm 管理：`nvm use v26.4.0`）
+- PostgreSQL 14+（本地或远程实例）
+
+## 快速开始
+
+### 1. 安装依赖
+
+```bash
+nvm use v26.4.0
+npm install
+```
+
+`postinstall` 会自动执行 `nuxt prepare` 生成 `.nuxt` 类型。
+
+### 2. 配置环境变量
+
+复制并按需修改 `.env`：
+
+```env
+# PostgreSQL 连接串，?schema= 指定业务 schema（CLI 与运行时均已适配）
+DATABASE_URL="postgresql://user:password@localhost:5432/postgres?schema=taiji"
+# JWT 签名密钥（生产环境务必更换为强随机值）
+JWT_SECRET="your-secret-key"
+```
+
+### 3. 初始化数据库
+
+```bash
+npm run db:generate   # 生成 Prisma Client（输出到 generated/prisma）
+npm run db:push       # 同步表结构到数据库
+npm run db:seed       # 写入种子数据（管理员 + 演示数据）
+```
+
+### 4. 启动开发服务
+
+```bash
+npm run dev
+```
+
+访问 http://localhost:3000 ，使用默认管理员登录：
+
+- 用户名：`admin`
+- 密码：`admin123`
+
+### 5. 其他脚本
+
+```bash
+npm run typecheck     # vue-tsc 全量类型检查
+npm run build         # 生产构建
+npm run preview       # 预览生产构建
+```
+
+## 功能模块
+
+| 菜单 | 路由 | 说明 |
+| --- | --- | --- |
+| 工作台 | `/` | 核心指标总览（会员数/活跃卡/课程/今日排期/待上课预约） |
+| 会员信息 | `/members` | 增删改查 + CSV 批量导入（姓名/分类/手机号/门店/渠道/教练/偏好标签/备注） |
+| 会员卡 | `/cards` | 开卡/充值/冻结/解冻/有效期延长，全部操作落流水 |
+| 课程管理 | `/courses` | 课程 CRUD（名称/店铺/教师/容纳人数/描述） |
+| 课程排期 | `/schedules` | 排期 CRUD（阶段/时段），教师时间冲突校验 |
+| 课程预约 | `/bookings` | 预约/取消/完成核销，容量与重复预约校验（事务防超卖） |
+| 课程评价 | `/reviews` | 评价录入/删除（会员/课程/1-5 星/建议） |
+| 教师管理 | `/teachers` | 教师 CRUD（姓名/资质/风格标签） |
+| 运营分析 | `/analytics` | 会员上课频次与标签分布、教师完成率与评价统计、课程报名统计 |
+| 系统配置 | `/settings` | 店铺管理（名称/地址/经营时段）+ 系统参数（key-value） |
+
+## 目录结构
+
+```
+taiji-space/
+├── app/
+│   ├── app.vue                 # 根组件（NuxtLayout + NuxtPage）
+│   ├── composables/useApi.ts   # 统一请求封装（自动携带 JWT、401 跳转、错误提示）
+│   ├── layouts/
+│   │   ├── default.vue         # toB 三段式布局（深色侧栏 + 顶栏 + 内容区）
+│   │   └── blank.vue           # 空白布局（登录页）
+│   └── pages/                  # 业务页面（见上方功能模块表）
+├── server/
+│   ├── api/                    # Nitro API（按模块目录组织，zod 校验入参）
+│   ├── middleware/             # JWT 统一鉴权中间件
+│   └── utils/prisma.ts         # Prisma Client 全局单例（防 HMR 连接泄漏）
+├── shared/                     # 前后端共享类型与枚举中文映射
+├── prisma/
+│   ├── schema.prisma           # 数据模型（11 张表）
+│   └── seed.ts                 # 种子数据（admin/admin123 + 演示数据）
+├── prisma.config.ts            # Prisma 7 CLI 配置（datasource.url + seed 命令）
+├── nuxt.config.ts              # Nuxt 配置（Element Plus、nuxt-auth local provider）
+└── prd.md                      # 系统详细设计文档
+```
+
+## 关键设计说明
+
+- **认证链路**：登录 → bcrypt 校验 → JWT 签发（7 天有效）→ nuxt-auth 存储 token 并自动携带 `Authorization: Bearer` → 服务端中间件统一校验（除 `/api/auth/login` 外全部接口需鉴权）。
+- **Prisma 7 适配**：schema 不再声明 `url`，CLI 连接由 `prisma.config.ts` 的 `datasource.url` 提供；运行时通过 `@prisma/adapter-pg` 连接，URL 中的 `?schema=` 参数被解析后显式传给 `PrismaPg`。
+- **性能**：列表全部服务端分页；统计走数据库聚合（groupBy/count/avg 并行）；分析页三 Tab 懒加载。
+- **内存**：Prisma Client/pg Pool 全局单例挂载 `globalThis`，避免 dev HMR 重复实例化导致连接泄漏；批量导入单次限 1000 行。
+- **一致性**：充值/预约等资金与库存操作使用 `prisma.$transaction` + 行级校验保证原子性、防超卖。
+
+## License
+
+仅供学习与内部使用。
