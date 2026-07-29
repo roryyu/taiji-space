@@ -1,0 +1,58 @@
+/* 全局样式初始化：消除浏览器默认样式差异（如 Chrome body margin:8px） */
+
+/* 统一盒模型，避免 padding/border 撑大元素 */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* 清除浏览器默认外边距（body 默认 margin:8px） */
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* 撑满视口，保证管理后台布局占满全屏 */
+html,
+body,
+#__nuxt {
+  height: 100%;
+}
+
+body {
+  /* 与 Element Plus 默认字体栈保持一致 */
+  font-family:
+    'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+  font-size: 14px;
+  color: #303133;
+  background-color: #f0f2f5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 标题/段落等默认外边距在组件内按需设置，全局清零避免意外空隙 */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}

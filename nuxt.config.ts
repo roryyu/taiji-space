@@ -8,6 +8,9 @@ export default defineNuxtConfig({
 
   modules: ['@element-plus/nuxt', '@sidebase/nuxt-auth'],
 
+  // 全局样式初始化（消除浏览器默认 body margin 等差异）
+  css: ['~/assets/css/main.css'],
+
   app: {
     head: {
       title: '太极空间 · 会员课程管理系统',
