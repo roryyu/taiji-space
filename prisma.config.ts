@@ -2,6 +2,11 @@
 import 'dotenv/config'
 import { defineConfig } from 'prisma/config'
 
+// 显式校验 DATABASE_URL，避免以 undefined 连接数据库导致难以定位的报错
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL 未配置，请先配置 .env（参考 .env.example）')
+}
+
 export default defineConfig({
   schema: 'prisma/schema.prisma',
   migrations: {
@@ -10,6 +15,6 @@ export default defineConfig({
   },
   // Prisma 7：db push / migrate 等 CLI 命令通过 datasource.url 连接数据库（schema 中不再声明 url）
   datasource: {
-    url: process.env.DATABASE_URL!,
+    url: process.env.DATABASE_URL,
   },
 })

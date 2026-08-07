@@ -38,6 +38,7 @@ async function fetchList() {
     items.value = res.items
     total.value = res.total
   }
+  catch { /* 已统一提示 */ }
   finally {
     loading.value = false
   }
@@ -101,10 +102,18 @@ async function handleSave() {
 }
 
 async function handleDelete(row: TeacherRow) {
-  await ElMessageBox.confirm(`确认删除教师「${row.name}」？`, '提示', { type: 'warning' })
-  await request(`/api/teachers/${row.id}`, { method: 'DELETE' })
-  ElMessage.success('删除成功')
-  fetchList()
+  try {
+    await ElMessageBox.confirm(`确认删除教师「${row.name}」？`, '提示', { type: 'warning' })
+  }
+  catch {
+    return // 用户取消
+  }
+  try {
+    await request(`/api/teachers/${row.id}`, { method: 'DELETE' })
+    ElMessage.success('删除成功')
+    fetchList()
+  }
+  catch { /* 已统一提示 */ }
 }
 
 onMounted(fetchList)

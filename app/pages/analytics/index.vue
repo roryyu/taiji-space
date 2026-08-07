@@ -55,6 +55,7 @@ async function loadTab(tab: string) {
       courseData.value = await request<CourseAnalytics>('/api/analytics/courses')
     }
   }
+  catch { /* 已统一提示 */ }
   finally {
     loading.value = false
   }

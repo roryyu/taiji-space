@@ -95,7 +95,7 @@ model AdminUser {
 /// 店铺（系统配置-店铺）
 model Store {
   id            Int      @id @default(autoincrement())
-  name          String
+  name          String   @unique
   address       String
   businessHours String // 经营时段，如 "09:00-21:00"
   createdAt     DateTime @default(now())
@@ -160,6 +160,7 @@ model MembershipCard {
   transactions CardTransaction[]
 
   @@index([memberId])
+  @@index([status, validTo])
 }
 
 /// 会员卡流水
@@ -243,7 +244,10 @@ model CourseReview {
   member Member @relation(fields: [memberId], references: [id])
   course Course @relation(fields: [courseId], references: [id])
 
+  // 同一会员对同一课程只允许一条评价
+  @@unique([memberId, courseId])
   @@index([courseId])
+  @@index([memberId])
 }
 
 /// 系统参数（key-value）

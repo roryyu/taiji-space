@@ -1,4 +1,11 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+
+// JWT 签名密钥必须通过环境变量注入；生产环境严禁静默回退到硬编码密钥（公开密钥等价于允许伪造任意管理员令牌）
+const jwtSecret = process.env.JWT_SECRET
+if (!jwtSecret && process.env.NODE_ENV === 'production') {
+  throw new Error('JWT_SECRET 未设置：生产环境请配置 32 字符以上的强随机密钥')
+}
+
 export default defineNuxtConfig({
   compatibilityDate: '2026-07-01',
   devtools: { enabled: false },
@@ -18,9 +25,9 @@ export default defineNuxtConfig({
     },
   },
 
-  // 服务端私有运行时配置（仅 Nitro 可见）
+  // 服务端私有运行时配置（仅 Nitro 可见）；兜底值仅在开发环境生效
   runtimeConfig: {
-    jwtSecret: process.env.JWT_SECRET || 'taiji-space-dev-secret',
+    jwtSecret: jwtSecret || 'taiji-space-dev-only-secret',
   },
 
   // @sidebase/nuxt-auth local provider：token 由 /api/auth/login 签发

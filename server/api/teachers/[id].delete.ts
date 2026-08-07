@@ -3,6 +3,9 @@
 export default defineEventHandler(async (event) => {
   const id = parseId(event)
 
+  const teacher = await prisma.teacher.findUnique({ where: { id }, select: { id: true } })
+  if (!teacher) throw createError({ statusCode: 404, message: '教师不存在' })
+
   const [courses, members] = await Promise.all([
     prisma.course.count({ where: { teacherId: id } }),
     prisma.member.count({ where: { coachId: id } }),

@@ -23,6 +23,9 @@ interface TxRow {
   createdAt: string
 }
 
+/** 会员选项 */
+interface MemberOption { id: number; name: string; phone: string }
+
 const asRow = (row: unknown) => row as CardRow
 
 const { request } = useApi()
@@ -50,6 +53,7 @@ async function fetchList() {
     items.value = res.items
     total.value = res.total
   }
+  catch { /* 已统一提示 */ }
   finally {
     loading.value = false
   }
@@ -66,7 +70,7 @@ function fmtDate(v: string) {
 }
 
 // ---------- 开卡 ----------
-const members = ref<{ id: number; name: string; phone: string }[]>([])
+const members = ref<MemberOption[]>([])
 const createVisible = ref(false)
 const saving = ref(false)
 const createForm = reactive({
@@ -76,12 +80,33 @@ const createForm = reactive({
   range: [] as string[],
 })
 
+// ---------- 会员远程搜索 ----------
+const memberLoading = ref(false)
+
+/** 加载会员选项（keyword 为空返回默认列表，否则按姓名/手机号模糊匹配） */
+async function loadMemberOptions(keyword = '') {
+  memberLoading.value = true
+  try {
+    const res = await request<{ members: MemberOption[] }>('/api/options', {
+      query: keyword ? { memberKeyword: keyword } : {},
+    })
+    members.value = res.members
+  }
+  catch { /* 已统一提示 */ }
+  finally {
+    memberLoading.value = false
+  }
+}
+
+function searchMembers(keyword: string) {
+  loadMemberOptions(keyword)
+}
+
 async function openCreate() {
   createVisible.value = true
   Object.assign(createForm, { memberId: undefined, type: 'COUNT', balance: 0, range: [] })
   if (!members.value.length) {
-    const res = await request<{ members: { id: number; name: string; phone: string }[] }>('/api/options')
-    members.value = res.members
+    await loadMemberOptions()
   }
 }
 
@@ -143,16 +168,27 @@ async function handleRecharge() {
 
 // ---------- 冻结 / 解冻 ----------
 async function handleFreeze(row: CardRow) {
-  await ElMessageBox.confirm(`确认冻结卡「${row.cardNo}」？冻结后不可充值/预约。`, '提示', { type: 'warning' })
-  await request(`/api/cards/${row.id}/freeze`, { method: 'POST' })
-  ElMessage.success('已冻结')
-  fetchList()
+  try {
+    await ElMessageBox.confirm(`确认冻结卡「${row.cardNo}」？冻结后不可充值/预约。`, '提示', { type: 'warning' })
+  }
+  catch {
+    return // 用户取消
+  }
+  try {
+    await request(`/api/cards/${row.id}/freeze`, { method: 'POST' })
+    ElMessage.success('已冻结')
+    fetchList()
+  }
+  catch { /* 已统一提示 */ }
 }
 
 async function handleUnfreeze(row: CardRow) {
-  await request(`/api/cards/${row.id}/unfreeze`, { method: 'POST' })
-  ElMessage.success('已解冻')
-  fetchList()
+  try {
+    await request(`/api/cards/${row.id}/unfreeze`, { method: 'POST' })
+    ElMessage.success('已解冻')
+    fetchList()
+  }
+  catch { /* 已统一提示 */ }
 }
 
 // ---------- 有效期管理 ----------
@@ -201,6 +237,7 @@ async function openTransactions(row: CardRow) {
     const res = await request<{ items: TxRow[] }>(`/api/cards/${row.id}/transactions`)
     txItems.value = res.items
   }
+  catch { /* 已统一提示 */ }
   finally {
     txLoading.value = false
   }
@@ -273,7 +310,14 @@ onMounted(fetchList)
     <el-dialog v-model="createVisible" title="开卡" width="480px">
       <el-form label-width="90px">
         <el-form-item label="会员" required>
-          <el-select v-model="createForm.memberId" filterable placeholder="搜索会员">
+          <el-select
+            v-model="createForm.memberId"
+            filterable
+            remote
+            :remote-method="searchMembers"
+            :loading="memberLoading"
+            placeholder="搜索会员"
+          >
             <el-option v-for="m in members" :key="m.id" :label="`${m.name}（${m.phone}）`" :value="m.id" />
           </el-select>
         </el-form-item>

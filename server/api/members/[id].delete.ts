@@ -3,6 +3,9 @@
 export default defineEventHandler(async (event) => {
   const id = parseId(event)
 
+  const member = await prisma.member.findUnique({ where: { id }, select: { id: true } })
+  if (!member) throw createError({ statusCode: 404, message: '会员不存在' })
+
   const [activeCards, activeBookings] = await Promise.all([
     prisma.membershipCard.count({ where: { memberId: id, status: { in: ['ACTIVE', 'FROZEN'] } } }),
     prisma.booking.count({ where: { memberId: id, status: 'BOOKED' } }),

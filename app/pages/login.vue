@@ -10,7 +10,7 @@ definePageMeta({
 
 const { signIn } = useAuth()
 
-const form = reactive({ username: 'admin', password: '' })
+const form = reactive({ username: '', password: '' })
 const loading = ref(false)
 
 /** 提交登录 */
@@ -64,7 +64,6 @@ async function handleLogin() {
           登 录
         </el-button>
       </el-form>
-      <p class="login-tip">默认账号：admin / admin123</p>
     </div>
   </div>
 </template>
@@ -112,12 +111,5 @@ async function handleLogin() {
 
 .login-btn {
   width: 100%;
-}
-
-.login-tip {
-  text-align: center;
-  color: #bfbfbf;
-  font-size: 12px;
-  margin-top: 16px;
 }
 </style>

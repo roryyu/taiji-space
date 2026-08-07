@@ -27,6 +27,7 @@ onMounted(async () => {
   try {
     overview.value = await request<Overview>('/api/analytics/overview')
   }
+  catch { /* 已统一提示 */ }
   finally {
     loading.value = false
   }

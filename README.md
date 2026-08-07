@@ -46,8 +46,8 @@ JWT_SECRET="your-secret-key"
 
 ```bash
 npm run db:generate   # 生成 Prisma Client（输出到 generated/prisma）
-npm run db:push       # 同步表结构到数据库
-npm run db:seed       # 写入种子数据（管理员 + 演示数据）
+npm run db:push       # 同步表结构到数据库（仅限开发环境）
+npm run db:seed       # 写入种子数据（管理员账号 + 演示数据）
 ```
 
 ### 4. 启动开发服务
@@ -56,10 +56,9 @@ npm run db:seed       # 写入种子数据（管理员 + 演示数据）
 npm run dev
 ```
 
-访问 http://localhost:3000 ，使用默认管理员登录：
+访问 http://localhost:3000 ，使用管理员账号登录。
 
-- 用户名：`admin`
-- 密码：`admin123`
+首次初始化时 seed 会创建用户名为 `admin` 的管理员账号：密码由环境变量 `SEED_ADMIN_PASSWORD` 指定；未设置时随机生成，并仅在 seed 的控制台输出中打印一次，请注意记录并妥善保管。上线后请立即修改管理员密码。
 
 ### 5. 其他脚本
 
@@ -68,6 +67,13 @@ npm run typecheck     # vue-tsc 全量类型检查
 npm run build         # 生产构建
 npm run preview       # 预览生产构建
 ```
+
+## 上线前检查清单
+
+- 生产环境必须配置高强度随机 `JWT_SECRET`（≥32 位，可用 `openssl rand -base64 32` 生成）与强数据库口令，不得复用本地 `.env`；
+- 数据库变更一律走迁移：开发环境执行 `npm run db:migrate` 生成 migration 并将 `prisma/migrations` 目录提交仓库（当前仓库尚无 `prisma/migrations`，首个 migration 需在开发环境生成）；生产环境只使用 `npm run db:deploy` 应用迁移，严禁执行 `prisma migrate dev` / `npm run db:push`；
+- 生产环境不要初始化演示数据：`db:seed` 在 `NODE_ENV=production` 下自动跳过演示数据，如确需初始化可设置 `SEED_DEMO=1` 强制执行；
+- 首次登录后立即修改管理员密码（seed 打印的初始密码仅输出一次）。
 
 ## 功能模块
 
@@ -102,7 +108,7 @@ taiji-space/
 ├── shared/                     # 前后端共享类型与枚举中文映射
 ├── prisma/
 │   ├── schema.prisma           # 数据模型（11 张表）
-│   └── seed.ts                 # 种子数据（admin/admin123 + 演示数据）
+│   └── seed.ts                 # 种子数据（管理员账号 + 演示数据）
 ├── prisma.config.ts            # Prisma 7 CLI 配置（datasource.url + seed 命令）
 ├── nuxt.config.ts              # Nuxt 配置（Element Plus、nuxt-auth local provider）
 └── prd.md                      # 系统详细设计文档

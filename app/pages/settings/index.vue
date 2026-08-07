@@ -41,6 +41,7 @@ async function fetchStores() {
     stores.value = res.items
     storeTotal.value = res.total
   }
+  catch { /* 已统一提示 */ }
   finally {
     storeLoading.value = false
   }
@@ -88,10 +89,18 @@ async function handleStoreSave() {
 }
 
 async function handleStoreDelete(row: StoreRow) {
-  await ElMessageBox.confirm(`确认删除店铺「${row.name}」？`, '提示', { type: 'warning' })
-  await request(`/api/stores/${row.id}`, { method: 'DELETE' })
-  ElMessage.success('删除成功')
-  fetchStores()
+  try {
+    await ElMessageBox.confirm(`确认删除店铺「${row.name}」？`, '提示', { type: 'warning' })
+  }
+  catch {
+    return // 用户取消
+  }
+  try {
+    await request(`/api/stores/${row.id}`, { method: 'DELETE' })
+    ElMessage.success('删除成功')
+    fetchStores()
+  }
+  catch { /* 已统一提示 */ }
 }
 
 // ---------- 系统参数 ----------
@@ -104,6 +113,7 @@ async function fetchParams() {
     const res = await request<{ items: ParamRow[] }>('/api/params')
     params.value = res.items
   }
+  catch { /* 已统一提示 */ }
   finally {
     paramLoading.value = false
   }
@@ -148,10 +158,18 @@ async function handleParamSave() {
 }
 
 async function handleParamDelete(row: ParamRow) {
-  await ElMessageBox.confirm(`确认删除参数「${row.key}」？`, '提示', { type: 'warning' })
-  await request(`/api/params/${encodeURIComponent(row.key)}`, { method: 'DELETE' })
-  ElMessage.success('删除成功')
-  fetchParams()
+  try {
+    await ElMessageBox.confirm(`确认删除参数「${row.key}」？`, '提示', { type: 'warning' })
+  }
+  catch {
+    return // 用户取消
+  }
+  try {
+    await request(`/api/params/${encodeURIComponent(row.key)}`, { method: 'DELETE' })
+    ElMessage.success('删除成功')
+    fetchParams()
+  }
+  catch { /* 已统一提示 */ }
 }
 
 onMounted(() => {

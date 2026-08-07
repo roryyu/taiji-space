@@ -45,14 +45,18 @@ async function fetchList() {
     items.value = res.items
     total.value = res.total
   }
+  catch { /* 已统一提示 */ }
   finally {
     loading.value = false
   }
 }
 
 async function fetchOptions() {
-  const res = await request<{ courses: CourseOption[] }>('/api/options')
-  courses.value = res.courses
+  try {
+    const res = await request<{ courses: CourseOption[] }>('/api/options')
+    courses.value = res.courses
+  }
+  catch { /* 已统一提示 */ }
 }
 
 function handleSearch() {
@@ -127,10 +131,18 @@ async function handleSave() {
 }
 
 async function handleDelete(row: ScheduleRow) {
-  await ElMessageBox.confirm('确认删除该排期？', '提示', { type: 'warning' })
-  await request(`/api/schedules/${row.id}`, { method: 'DELETE' })
-  ElMessage.success('删除成功')
-  fetchList()
+  try {
+    await ElMessageBox.confirm('确认删除该排期？', '提示', { type: 'warning' })
+  }
+  catch {
+    return // 用户取消
+  }
+  try {
+    await request(`/api/schedules/${row.id}`, { method: 'DELETE' })
+    ElMessage.success('删除成功')
+    fetchList()
+  }
+  catch { /* 已统一提示 */ }
 }
 
 onMounted(() => {
@@ -207,7 +219,7 @@ onMounted(() => {
     <el-dialog v-model="dialogVisible" :title="editingId ? '编辑排期' : '新增排期'" width="520px">
       <el-form label-width="90px">
         <el-form-item label="课程" required>
-          <el-select v-model="form.courseId" filterable placeholder="请选择课程">
+          <el-select v-model="form.courseId" filterable placeholder="请选择课程" :disabled="!!editingId">
             <el-option v-for="c in courses" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-form-item>

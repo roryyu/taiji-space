@@ -57,6 +57,7 @@ async function fetchList() {
     items.value = res.items
     total.value = res.total
   }
+  catch { /* 已统一提示 */ }
   finally {
     loading.value = false
   }
@@ -80,16 +81,40 @@ const members = ref<MemberOption[]>([])
 const openSchedules = ref<ScheduleOption[]>([])
 const form = reactive({ memberId: undefined as number | undefined, scheduleId: undefined as number | undefined })
 
+// ---------- 会员远程搜索 ----------
+const memberLoading = ref(false)
+
+/** 加载会员选项（keyword 为空返回默认列表，否则按姓名/手机号模糊匹配） */
+async function loadMemberOptions(keyword = '') {
+  memberLoading.value = true
+  try {
+    const res = await request<{ members: MemberOption[] }>('/api/options', {
+      query: keyword ? { memberKeyword: keyword } : {},
+    })
+    members.value = res.members
+  }
+  catch { /* 已统一提示 */ }
+  finally {
+    memberLoading.value = false
+  }
+}
+
+function searchMembers(keyword: string) {
+  loadMemberOptions(keyword)
+}
+
 async function openCreate() {
   Object.assign(form, { memberId: undefined, scheduleId: undefined })
   dialogVisible.value = true
   // 会员选项 + 开放预约的排期并行加载
-  const [opts, schedules] = await Promise.all([
-    request<{ members: MemberOption[] }>('/api/options'),
-    request<{ items: ScheduleOption[] }>('/api/schedules', { query: { status: 'OPEN', pageSize: 100 } }),
-  ])
-  members.value = opts.members
-  openSchedules.value = schedules.items
+  try {
+    const [, schedules] = await Promise.all([
+      loadMemberOptions(),
+      request<{ items: ScheduleOption[] }>('/api/schedules', { query: { status: 'OPEN', pageSize: 100 } }),
+    ])
+    openSchedules.value = schedules.items
+  }
+  catch { /* 已统一提示 */ }
 }
 
 /** 排期展示文案：课程 / 阶段 / 时间 / 余位 */
@@ -118,16 +143,27 @@ async function handleCreate() {
 
 // ---------- 取消 / 完成 ----------
 async function handleCancel(row: BookingRow) {
-  await ElMessageBox.confirm(`确认取消「${row.member.name}」的预约？`, '提示', { type: 'warning' })
-  await request(`/api/bookings/${row.id}/cancel`, { method: 'POST' })
-  ElMessage.success('已取消')
-  fetchList()
+  try {
+    await ElMessageBox.confirm(`确认取消「${row.member.name}」的预约？`, '提示', { type: 'warning' })
+  }
+  catch {
+    return // 用户取消
+  }
+  try {
+    await request(`/api/bookings/${row.id}/cancel`, { method: 'POST' })
+    ElMessage.success('已取消')
+    fetchList()
+  }
+  catch { /* 已统一提示 */ }
 }
 
 async function handleComplete(row: BookingRow) {
-  await request(`/api/bookings/${row.id}/complete`, { method: 'POST' })
-  ElMessage.success('已完成核销')
-  fetchList()
+  try {
+    await request(`/api/bookings/${row.id}/complete`, { method: 'POST' })
+    ElMessage.success('已完成核销')
+    fetchList()
+  }
+  catch { /* 已统一提示 */ }
 }
 
 onMounted(fetchList)
@@ -195,7 +231,15 @@ onMounted(fetchList)
     <el-dialog v-model="dialogVisible" title="新增预约" width="560px">
       <el-form label-width="90px">
         <el-form-item label="会员" required>
-          <el-select v-model="form.memberId" filterable placeholder="搜索会员">
+          <el-select
+            v-model="form.memberId"
+            filterable
+            remote
+            reserve-keyword
+            :remote-method="searchMembers"
+            :loading="memberLoading"
+            placeholder="按姓名/手机号搜索"
+          >
             <el-option v-for="m in members" :key="m.id" :label="`${m.name}（${m.phone}）`" :value="m.id" />
           </el-select>
         </el-form-item>

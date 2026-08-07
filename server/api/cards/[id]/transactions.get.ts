@@ -5,9 +5,11 @@ export default defineEventHandler(async (event) => {
   const card = await prisma.membershipCard.findUnique({ where: { id }, select: { id: true } })
   if (!card) throw createError({ statusCode: 404, message: '会员卡不存在' })
 
-  return prisma.cardTransaction.findMany({
+  // 与其他列表接口保持一致的 { items } 返回结构
+  const items = await prisma.cardTransaction.findMany({
     where: { cardId: id },
     orderBy: { id: 'desc' },
     take: 100,
   })
+  return { items }
 })

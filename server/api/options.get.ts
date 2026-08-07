@@ -9,7 +9,7 @@ export default defineEventHandler(async () => {
     }),
     prisma.member.findMany({
       select: { id: true, name: true, phone: true },
-      orderBy: { id: 'asc' },
+      orderBy: { id: 'desc' }, // 取最近录入的会员，避免 asc 截断导致新会员无法被选中
       take: 500, // 兜底上限，防止会员量过大拖垮接口
     }),
     prisma.course.findMany({

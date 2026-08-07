@@ -46,15 +46,40 @@ async function fetchList() {
     items.value = res.items
     total.value = res.total
   }
+  catch { /* 已统一提示 */ }
   finally {
     loading.value = false
   }
 }
 
 async function fetchOptions() {
-  const res = await request<{ members: MemberOption[]; courses: CourseOption[] }>('/api/options')
-  members.value = res.members
-  courses.value = res.courses
+  try {
+    const res = await request<{ courses: CourseOption[] }>('/api/options')
+    courses.value = res.courses
+  }
+  catch { /* 已统一提示 */ }
+}
+
+// ---------- 会员远程搜索 ----------
+const memberLoading = ref(false)
+
+/** 加载会员选项（keyword 为空返回默认列表，否则按姓名/手机号模糊匹配） */
+async function loadMemberOptions(keyword = '') {
+  memberLoading.value = true
+  try {
+    const res = await request<{ members: MemberOption[] }>('/api/options', {
+      query: keyword ? { memberKeyword: keyword } : {},
+    })
+    members.value = res.members
+  }
+  catch { /* 已统一提示 */ }
+  finally {
+    memberLoading.value = false
+  }
+}
+
+function searchMembers(keyword: string) {
+  loadMemberOptions(keyword)
 }
 
 function handleSearch() {
@@ -72,9 +97,12 @@ const form = reactive({
   suggestion: '',
 })
 
-function openCreate() {
+async function openCreate() {
   Object.assign(form, { memberId: undefined, courseId: undefined, rating: 5, suggestion: '' })
   dialogVisible.value = true
+  if (!members.value.length) {
+    await loadMemberOptions()
+  }
 }
 
 async function handleSave() {
@@ -99,10 +127,18 @@ async function handleSave() {
 }
 
 async function handleDelete(row: ReviewRow) {
-  await ElMessageBox.confirm('确认删除该评价？', '提示', { type: 'warning' })
-  await request(`/api/reviews/${row.id}`, { method: 'DELETE' })
-  ElMessage.success('删除成功')
-  fetchList()
+  try {
+    await ElMessageBox.confirm('确认删除该评价？', '提示', { type: 'warning' })
+  }
+  catch {
+    return // 用户取消
+  }
+  try {
+    await request(`/api/reviews/${row.id}`, { method: 'DELETE' })
+    ElMessage.success('删除成功')
+    fetchList()
+  }
+  catch { /* 已统一提示 */ }
 }
 
 onMounted(() => {
@@ -168,7 +204,14 @@ onMounted(() => {
     <el-dialog v-model="dialogVisible" title="录入评价" width="480px">
       <el-form label-width="70px">
         <el-form-item label="会员" required>
-          <el-select v-model="form.memberId" filterable placeholder="搜索会员">
+          <el-select
+            v-model="form.memberId"
+            filterable
+            remote
+            :remote-method="searchMembers"
+            :loading="memberLoading"
+            placeholder="搜索会员"
+          >
             <el-option v-for="m in members" :key="m.id" :label="`${m.name}（${m.phone}）`" :value="m.id" />
           </el-select>
         </el-form-item>

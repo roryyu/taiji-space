@@ -19,6 +19,14 @@ export default defineEventHandler(async (event) => {
   const exists = await prisma.member.findUnique({ where: { phone: data.phone } })
   if (exists) throw createError({ statusCode: 400, message: '该手机号已存在' })
 
+  // 外键存在性校验，避免非法 storeId/coachId 触发未封装的 500
+  const store = await prisma.store.findUnique({ where: { id: data.storeId }, select: { id: true } })
+  if (!store) throw createError({ statusCode: 400, message: '门店不存在' })
+  if (data.coachId) {
+    const coach = await prisma.teacher.findUnique({ where: { id: data.coachId }, select: { id: true } })
+    if (!coach) throw createError({ statusCode: 400, message: '专属教练不存在' })
+  }
+
   return prisma.member.create({
     data: { ...data, coachId: data.coachId ?? null, remark: data.remark ?? null },
   })

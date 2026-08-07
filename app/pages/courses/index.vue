@@ -47,15 +47,19 @@ async function fetchList() {
     items.value = res.items
     total.value = res.total
   }
+  catch { /* 已统一提示 */ }
   finally {
     loading.value = false
   }
 }
 
 async function fetchOptions() {
-  const res = await request<{ stores: OptionItem[]; teachers: OptionItem[] }>('/api/options')
-  stores.value = res.stores
-  teachers.value = res.teachers
+  try {
+    const res = await request<{ stores: OptionItem[]; teachers: OptionItem[] }>('/api/options')
+    stores.value = res.stores
+    teachers.value = res.teachers
+  }
+  catch { /* 已统一提示 */ }
 }
 
 function handleSearch() {
@@ -119,10 +123,18 @@ async function handleSave() {
 }
 
 async function handleDelete(row: CourseRow) {
-  await ElMessageBox.confirm(`确认删除课程「${row.name}」？`, '提示', { type: 'warning' })
-  await request(`/api/courses/${row.id}`, { method: 'DELETE' })
-  ElMessage.success('删除成功')
-  fetchList()
+  try {
+    await ElMessageBox.confirm(`确认删除课程「${row.name}」？`, '提示', { type: 'warning' })
+  }
+  catch {
+    return // 用户取消
+  }
+  try {
+    await request(`/api/courses/${row.id}`, { method: 'DELETE' })
+    ElMessage.success('删除成功')
+    fetchList()
+  }
+  catch { /* 已统一提示 */ }
 }
 
 onMounted(() => {

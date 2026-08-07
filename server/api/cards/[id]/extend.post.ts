@@ -9,7 +9,9 @@ const schema = z.object({
 
 export default defineEventHandler(async (event) => {
   const id = parseId(event)
-  const { validTo, remark } = await parseBody(event, schema)
+  const { validTo: rawValidTo, remark } = await parseBody(event, schema)
+  // 归一化到业务日（UTC+8）结束时刻，与开卡口径保持一致
+  const validTo = endOfDayCST(rawValidTo)
 
   return prisma.$transaction(async (tx) => {
     const card = await tx.membershipCard.findUnique({ where: { id } })

@@ -53,6 +53,7 @@ async function fetchList() {
     items.value = res.items
     total.value = res.total
   }
+  catch { /* 已统一提示 */ }
   finally {
     loading.value = false
   }
@@ -60,9 +61,12 @@ async function fetchList() {
 
 /** 拉取下拉选项 */
 async function fetchOptions() {
-  const res = await request<{ stores: OptionItem[]; teachers: OptionItem[] }>('/api/options')
-  stores.value = res.stores
-  teachers.value = res.teachers
+  try {
+    const res = await request<{ stores: OptionItem[]; teachers: OptionItem[] }>('/api/options')
+    stores.value = res.stores
+    teachers.value = res.teachers
+  }
+  catch { /* 已统一提示 */ }
 }
 
 function handleSearch() {
@@ -137,17 +141,45 @@ async function handleSave() {
 
 /** 删除会员 */
 async function handleDelete(row: MemberRow) {
-  await ElMessageBox.confirm(`确认删除会员「${row.name}」？`, '提示', { type: 'warning' })
-  await request(`/api/members/${row.id}`, { method: 'DELETE' })
-  ElMessage.success('删除成功')
-  fetchList()
+  try {
+    await ElMessageBox.confirm(`确认删除会员「${row.name}」？`, '提示', { type: 'warning' })
+  }
+  catch {
+    return // 用户取消
+  }
+  try {
+    await request(`/api/members/${row.id}`, { method: 'DELETE' })
+    ElMessage.success('删除成功')
+    fetchList()
+  }
+  catch { /* 已统一提示 */ }
 }
 
 // ---------- 批量导入 ----------
 const importVisible = ref(false)
 const importText = ref('')
+const importStoreId = ref<number | undefined>(undefined)
 const importing = ref(false)
-const importResult = ref<{ total: number; successCount: number; failCount: number; results: { row: number; success: boolean; message?: string }[] } | null>(null)
+
+/** 导入结果（对应 /api/members/import 响应） */
+interface ImportResult {
+  total: number
+  successCount: number
+  failCount: number
+  results: { line: number; name: string; success: boolean; message: string }[]
+}
+const importResult = ref<ImportResult | null>(null)
+
+/** 打开导入对话框（门店选项未加载时先加载） */
+async function openImport() {
+  importVisible.value = true
+  importText.value = ''
+  importStoreId.value = undefined
+  importResult.value = null
+  if (!stores.value.length) {
+    await fetchOptions()
+  }
+}
 
 /** 提交批量导入（CSV 文本：姓名,手机号,分类,渠道,门店名称） */
 async function handleImport() {
@@ -155,11 +187,15 @@ async function handleImport() {
     ElMessage.warning('请粘贴导入数据')
     return
   }
+  if (!importStoreId.value) {
+    ElMessage.warning('请选择默认门店')
+    return
+  }
   importing.value = true
   try {
-    importResult.value = await request('/api/members/import', {
+    importResult.value = await request<ImportResult>('/api/members/import', {
       method: 'POST',
-      body: { text: importText.value },
+      body: { csv: importText.value, defaultStoreId: importStoreId.value },
     })
     fetchList()
   }
@@ -191,7 +227,7 @@ onMounted(() => {
       </el-select>
       <el-button type="primary" @click="handleSearch">查询</el-button>
       <div class="spacer" />
-      <el-button @click="importVisible = true; importResult = null; importText = ''">批量导入</el-button>
+      <el-button @click="openImport">批量导入</el-button>
       <el-button type="primary" @click="openCreate">新增会员</el-button>
     </div>
 
@@ -292,12 +328,19 @@ onMounted(() => {
         <p>每行一条记录，逗号分隔：姓名,手机号,分类,渠道,门店名称</p>
         <p>示例：张三,13800001234,VIP,转介绍,朝阳门店（分类/渠道/门店可留空取默认值）</p>
       </el-alert>
+      <el-form label-width="80px">
+        <el-form-item label="默认门店" required>
+          <el-select v-model="importStoreId" placeholder="请选择默认门店">
+            <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
+          </el-select>
+        </el-form-item>
+      </el-form>
       <el-input v-model="importText" type="textarea" :rows="8" placeholder="张三,13800001234,VIP,转介绍,朝阳门店" />
       <div v-if="importResult" class="import-result">
         <p>共 {{ importResult.total }} 条，成功 {{ importResult.successCount }} 条，失败 {{ importResult.failCount }} 条</p>
         <ul class="import-errors">
-          <li v-for="r in importResult.results.filter((x) => !x.success)" :key="r.row">
-            第 {{ r.row }} 行：{{ r.message }}
+          <li v-for="r in importResult.results.filter((x) => !x.success)" :key="r.line">
+            第 {{ r.line }} 行：{{ r.message }}
           </li>
         </ul>
       </div>

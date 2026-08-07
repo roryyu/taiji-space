@@ -33,9 +33,9 @@ export default defineEventHandler(async (event) => {
       throw createError({ statusCode: 400, message: '该会员已预约此排期' })
     }
 
-    // 容量校验：有效预约数不得达到课程容纳人数
+    // 容量校验：BOOKED 数不得达到课程容纳人数（prd 口径：BOOKED 数 < 容量）
     const booked = await tx.booking.count({
-      where: { scheduleId, status: { not: 'CANCELLED' } },
+      where: { scheduleId, status: 'BOOKED' },
     })
     if (booked >= schedule.course.capacity) {
       throw createError({ statusCode: 400, message: '该排期已满员' })

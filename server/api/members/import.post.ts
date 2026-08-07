@@ -16,6 +16,10 @@ const rowSchema = z.object({
 export default defineEventHandler(async (event) => {
   const { csv, defaultStoreId } = await parseBody(event, schema)
 
+  // 默认门店存在性校验，避免逐行写入时才因外键失败
+  const defaultStore = await prisma.store.findUnique({ where: { id: defaultStoreId }, select: { id: true } })
+  if (!defaultStore) throw createError({ statusCode: 400, message: '默认门店不存在' })
+
   const lines = csv
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -58,8 +62,10 @@ export default defineEventHandler(async (event) => {
       })
       successCount++
       results.push({ line: index + 1, name, success: true, message: '导入成功' })
-    } catch {
-      results.push({ line: index + 1, name, success: false, message: '写入失败' })
+    } catch (err) {
+      // 区分唯一约束冲突与其他错误，便于定位问题行
+      const message = (err as { code?: string } | null)?.code === 'P2002' ? '手机号已存在' : '写入失败'
+      results.push({ line: index + 1, name, success: false, message })
     }
   }
 
