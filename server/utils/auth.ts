@@ -6,6 +6,7 @@ export interface AuthPayload {
   id: number
   username: string
   name: string
+  type: 'TEACHER' | 'MANAGER' | 'ADMINISTRATOR'
 }
 
 const TOKEN_EXPIRES_IN = '7d' // 与前端 token.maxAgeInSeconds 保持一致

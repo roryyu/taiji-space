@@ -8,6 +8,7 @@ const schema = z.object({
   storeId: z.number().int().positive('请选择门店'),
   courseId: z.number().int().positive('请选择课程'),
   coachId: z.number().int().positive('请选择教练'),
+  staffId: z.number().int().positive().optional(), // ADMINISTRATOR 可指定 MANAGER
   totalAmount: z.number().int().min(0, '总金额不能为负').default(0),
   totalSessions: z.number().int().min(0, '总次数不能为负').default(0),
   giftSessions: z.number().int().min(0, '赠送次数不能为负').default(0),
@@ -22,6 +23,21 @@ function generateCardNo(): string {
 
 export default defineEventHandler(async (event) => {
   const data = await parseBody(event, schema)
+
+  // 获取当前登录员工信息
+  const auth = event.context.auth as AuthPayload | undefined
+  if (!auth) throw createError({ statusCode: 401, message: '未登录' })
+
+  // 确定 staffId：ADMINISTRATOR 使用传入的 staffId，MANAGER 使用自己的 id
+  let staffId: number | null = null
+  if (auth.type === 'ADMINISTRATOR') {
+    // ADMINISTRATOR 必须指定一个 MANAGER
+    if (!data.staffId) throw createError({ statusCode: 400, message: '请选择负责员工' })
+    staffId = data.staffId
+  } else if (auth.type === 'MANAGER') {
+    // MANAGER 自动使用自己的 id
+    staffId = auth.id
+  }
 
   // 归一化为业务日起止，避免 "YYYY-MM-DD" 按 UTC 零点解析造成 UTC+8 下提前过期
   const validFrom = startOfDayCST(data.validFrom)
@@ -57,6 +73,7 @@ export default defineEventHandler(async (event) => {
             storeId: data.storeId,
             courseId: data.courseId,
             coachId: data.coachId,
+            staffId,
             totalAmount: data.totalAmount,
             totalSessions: data.totalSessions,
             giftSessions: data.giftSessions,

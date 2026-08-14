@@ -8,6 +8,7 @@ const schema = z.object({
   businessHours: z
     .string()
     .regex(/^([01]\d|2[0-3]):[0-5]\d-([01]\d|2[0-3]):[0-5]\d$/, '经营时段格式为 HH:mm-HH:mm（如 09:00-21:00）'),
+  staffId: z.coerce.number().int().positive().optional(), // 店长（MANAGER 类型员工）
 })
 
 export default defineEventHandler(async (event) => {

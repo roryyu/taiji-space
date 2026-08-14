@@ -8,7 +8,15 @@ interface StoreRow {
   name: string
   address: string
   businessHours: string
+  staffId: number | null
+  manager: { id: number; name: string } | null
   _count: { members: number; courses: number }
+}
+
+/** 店长候选项 */
+interface ManagerOption {
+  id: number
+  name: string
 }
 
 /** 系统参数行数据 */
@@ -31,6 +39,7 @@ const stores = ref<StoreRow[]>([])
 const storeTotal = ref(0)
 const storePage = ref(1)
 const storePageSize = ref(10)
+const managers = ref<ManagerOption[]>([])
 
 async function fetchStores() {
   storeLoading.value = true
@@ -47,20 +56,30 @@ async function fetchStores() {
   }
 }
 
+async function fetchManagers() {
+  try {
+    const res = await request<{ items: ManagerOption[] }>('/api/staffs', {
+      query: { type: 'MANAGER', pageSize: 100 },
+    })
+    managers.value = res.items
+  }
+  catch { /* 已统一提示 */ }
+}
+
 const storeDialogVisible = ref(false)
 const storeSaving = ref(false)
 const editingStoreId = ref<number | null>(null)
-const storeForm = reactive({ name: '', address: '', businessHours: '09:00-21:00' })
+const storeForm = reactive({ name: '', address: '', businessHours: '09:00-21:00', staffId: null as number | null })
 
 function openStoreCreate() {
   editingStoreId.value = null
-  Object.assign(storeForm, { name: '', address: '', businessHours: '09:00-21:00' })
+  Object.assign(storeForm, { name: '', address: '', businessHours: '09:00-21:00', staffId: null })
   storeDialogVisible.value = true
 }
 
 function openStoreEdit(row: StoreRow) {
   editingStoreId.value = row.id
-  Object.assign(storeForm, { name: row.name, address: row.address, businessHours: row.businessHours })
+  Object.assign(storeForm, { name: row.name, address: row.address, businessHours: row.businessHours, staffId: row.staffId })
   storeDialogVisible.value = true
 }
 
@@ -174,6 +193,7 @@ async function handleParamDelete(row: ParamRow) {
 
 onMounted(() => {
   fetchStores()
+  fetchManagers()
   fetchParams()
 })
 </script>
@@ -192,6 +212,9 @@ onMounted(() => {
           <el-table-column prop="name" label="店铺名称" min-width="140" />
           <el-table-column prop="address" label="地址" min-width="220" />
           <el-table-column prop="businessHours" label="经营时段" width="130" />
+          <el-table-column label="店长" width="100">
+            <template #default="{ row }">{{ row.manager?.name ?? '-' }}</template>
+          </el-table-column>
           <el-table-column label="会员数" width="80">
             <template #default="{ row }">{{ row._count?.members ?? 0 }}</template>
           </el-table-column>
@@ -248,6 +271,11 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="经营时段" required>
           <el-input v-model="storeForm.businessHours" placeholder="09:00-21:00" maxlength="11" />
+        </el-form-item>
+        <el-form-item label="店长">
+          <el-select v-model="storeForm.staffId" placeholder="请选择店长（可选）" clearable>
+            <el-option v-for="m in managers" :key="m.id" :label="m.name" :value="m.id" />
+          </el-select>
         </el-form-item>
       </el-form>
       <template #footer>

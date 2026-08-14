@@ -18,7 +18,10 @@ export default defineEventHandler(async (event) => {
     prisma.store.findMany({
       where,
       // 附带门店下会员/课程数量，供列表展示与删除前提示
-      include: { _count: { select: { members: true, courses: true } } },
+      include: {
+        manager: { select: { id: true, name: true } },
+        _count: { select: { cards: true } },
+      },
       orderBy: { id: 'asc' },
       skip,
       take,

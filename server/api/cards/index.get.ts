@@ -13,7 +13,18 @@ export default defineEventHandler(async (event) => {
   const { keyword, storeId, courseId, coachId } = parseQuery(event, schema)
   const { page, pageSize, skip, take } = parsePagination(event)
 
+  // 获取当前登录员工信息
+  const auth = event.context.auth as AuthPayload | undefined
+
+  // 根据角色过滤：MANAGER 只能看自己创建的，ADMINISTRATOR 可以看所有
+  const staffFilter: Prisma.MembershipCardWhereInput = {}
+  if (auth?.type === 'MANAGER') {
+    staffFilter.staffId = auth.id
+  }
+  // ADMINISTRATOR 和其他类型不过滤（可以看到所有数据）
+
   const where: Prisma.MembershipCardWhereInput = {
+    ...staffFilter,
     ...(keyword
       ? {
           OR: [
@@ -40,6 +51,7 @@ export default defineEventHandler(async (event) => {
         store: { select: { id: true, name: true } },
         course: { select: { id: true, name: true } },
         coach: { select: { id: true, name: true } },
+        creator: { select: { id: true, name: true } },
       },
     }),
   ])

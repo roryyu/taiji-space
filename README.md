@@ -106,7 +106,7 @@ npm run db:deploy     # 生产环境：仅应用已提交的迁移
 | 课程评价 | `/reviews` | 评价录入/删除（会员/课程/1-5 星/建议） |
 | 员工管理 | `/staffs` | 员工 CRUD（姓名/资质/风格标签/账号/密码/类型：教练/经理/管理员） |
 | 运营分析 | `/analytics` | 会员标签分布、员工统计、课程报名统计 |
-| 系统配置 | `/settings` | 店铺管理（名称/地址/经营时段）+ 系统参数（key-value） |
+| 系统配置 | `/settings` | 店铺管理（名称/地址/经营时段/店长）+ 系统参数（key-value） |
 
 ## 目录结构
 
@@ -135,7 +135,8 @@ taiji-space/
 
 ## 关键设计说明
 
-- **认证链路**：登录 → Staff 表 account/bcrypt 校验 → JWT 签发（7 天有效）→ nuxt-auth 存储 token 并自动携带 `Authorization: Bearer` → 服务端中间件统一校验（除 `/api/auth/login` 外全部接口需鉴权）。
+- **认证链路**：登录 → Staff 表 account/bcrypt 校验 → JWT 签发（7 天有效，包含 id/username/name/type）→ nuxt-auth 存储 token 并自动携带 `Authorization: Bearer` → 服务端中间件统一校验（除 `/api/auth/login` 外全部接口需鉴权）。
+- **菜单权限控制**：基于 Staff 表 `type` 字段实现菜单级权限控制，JWT token 中包含用户角色信息，前端根据角色动态过滤菜单项，无权限页面自动重定向到默认首页。
 - **Prisma 7 适配**：schema 不再声明 `url`，CLI 连接由 `prisma.config.ts` 的 `datasource.url` 提供；运行时通过 `@prisma/adapter-pg` 连接，URL 中的 `?schema=` 参数被解析后显式传给 `PrismaPg`。
 - **性能**：列表全部服务端分页；统计走数据库聚合（groupBy/count/avg 并行）；分析页三 Tab 懒加载。
 - **内存**：Prisma Client/pg Pool 全局单例挂载 `globalThis`，避免 dev HMR 重复实例化导致连接泄漏；批量导入单次限 1000 行。
@@ -152,6 +153,7 @@ taiji-space/
 | 新建 `Staff` 表 | 字段：id/name/qualification(可选)/styleTags/account(唯一)/password( bcrypt)/type(TEACHER/MANAGER/ADMINISTRATOR) |
 | `Member` 表 | 移除 storeId/coachId/category 字段 |
 | `MembershipCard` 表 | 移除 type/balance/status；新增 storeId/courseId/coachId 关联 + totalAmount/totalSessions/giftSessions 整数字段 |
+| `MembershipCard` 表 | 新增 staffId 字段（关联 Staff），记录负责员工（MANAGER/ADMINISTRATOR） |
 | `Course` 表 | 移除 storeId/teacherId/capacity 字段 |
 
 ### 登录逻辑变更
@@ -159,11 +161,106 @@ taiji-space/
 - 原：`AdminUser` 表 username/password 认证
 - 现：`Staff` 表 account/password 认证（bcrypt 加密，防暴力破解锁定机制保留）
 
+### 菜单权限控制（2026-08-14）
+
+#### 角色权限矩阵
+
+| 角色 | 可见菜单 |
+| --- | --- |
+| TEACHER（教练） | 课程排期、课程预约 |
+| MANAGER（经理） | 工作台、会员信息、会员卡、课程管理、课程排期、课程预约、课程评价、运营分析 |
+| ADMINISTRATOR（管理员） | 所有菜单 |
+
+#### 实现方案
+
+**后端变更：**
+
+| 文件 | 变更说明 |
+| --- | --- |
+| `server/utils/auth.ts` | AuthPayload 接口新增 `type` 字段（TEACHER/MANAGER/ADMINISTRATOR） |
+| `server/api/auth/login.post.ts` | JWT 签发时包含 `user.type` |
+| `server/api/auth/session.get.ts` | session 接口返回 `type` 字段 |
+| `nuxt.config.ts` | session dataType 配置新增 `type: 'string'` |
+
+**前端变更：**
+
+| 文件 | 变更说明 |
+| --- | --- |
+| `app/layouts/default.vue` | 菜单配置增加 `roles` 字段；根据用户角色动态过滤菜单；无权限页面自动重定向到默认首页 |
+| `app/pages/login.vue` | 登录成功后根据角色跳转到对应默认首页（TEACHER → /schedules，其他 → /） |
+
+#### 技术细节
+
+- JWT token 采用 HS256 算法签名，payload 包含 `{id, username, name, type}`
+- 前端通过 `useAuth()` composable 获取 session 数据，`session.value.type` 为当前用户角色
+- 菜单过滤逻辑：`allMenus.filter(menu => menu.roles.includes(userRole))`
+- 权限守卫：监听 `session.type` 和 `route.path`，无权限时自动重定向
+
 ### 路由变更
 
 | 原路由 | 新路由 | 说明 |
 | --- | --- | --- |
 | `/teachers` | `/staffs` | 教师管理 → 员工管理 |
+
+### 会员卡 staffId 功能（2026-08-14）
+
+#### 数据模型变更
+
+- `MembershipCard` 表新增 `staffId` 字段（可选，关联 Staff 表）
+- 用于记录负责员工（MANAGER 或 ADMINISTRATOR 创建时保存对应的 staffId）
+
+#### API 变更
+
+| 接口 | 变更说明 |
+| --- | --- |
+| `POST /api/cards` | 开卡时自动保存 staffId：ADMINISTRATOR 需手动选择 MANAGER 作为负责员工；MANAGER 自动使用当前登录用户 id |
+| `GET /api/cards` | 列表查询根据角色过滤：MANAGER 只能查看自己创建的数据；ADMINISTRATOR 可查看所有数据；返回 creator 信息 |
+| `PUT /api/cards/:id` | 编辑权限控制：ADMINISTRATOR 可编辑所有会员卡（含修改负责员工）；MANAGER 只能编辑自己创建的数据 |
+| `GET /api/options` | 门店选项新增返回 staffId（店长），用于自动填充负责员工 |
+
+#### 前端变更
+
+| 变更项 | 说明 |
+| --- | --- |
+| 会员卡列表 | 新增"创建人"列；"员工"列改为"授课教师"列；移除"延期"和"流水"操作按钮；编辑按钮根据角色权限显示 |
+| 开卡表单 | "员工"改为"授课教师"（仅显示 TEACHER 类型）；ADMINISTRATOR 可见"负责员工"下拉框（仅显示 MANAGER 类型）；选择门店时自动填充店长到负责员工 |
+| 编辑表单 | 同开卡表单变更；ADMINISTRATOR 可修改负责员工 |
+| 权限控制 | ADMINISTRATOR 可编辑所有会员卡；MANAGER 只能编辑自己创建的会员卡 |
+
+#### 数据库迁移
+
+```bash
+npx prisma migrate dev --name add_membershipcard_staffid
+```
+
+### 店铺店长功能（2026-08-14）
+
+#### 数据模型变更
+
+- `Store` 表新增 `staffId` 字段（可选，关联 Staff 表）
+- 用于指定店铺的店长（MANAGER 类型员工）
+- Staff 表新增 `stores` 反向关系
+
+#### API 变更
+
+| 接口 | 变更说明 |
+| --- | --- |
+| `GET /api/stores` | 列表查询返回 manager 信息（id/name） |
+| `POST /api/stores` | 新增时支持 staffId 参数 |
+| `PUT /api/stores/:id` | 编辑时支持 staffId 参数（null 可清除店长） |
+
+#### 前端变更
+
+| 变更项 | 说明 |
+| --- | --- |
+| 店铺列表 | 新增"店长"列显示 |
+| 店铺表单 | 新增店长下拉选择（仅显示 MANAGER 类型员工） |
+
+#### 数据库迁移
+
+```bash
+npx prisma migrate dev --name add_store_staffid
+```
 
 ## License
 

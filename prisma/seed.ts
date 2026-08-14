@@ -52,10 +52,10 @@ async function main() {
       // 2.1 店铺
       const [store1, store2] = await Promise.all([
         tx.store.create({
-          data: { name: '太极空间·望京店', address: '北京市朝阳区望京 SOHO T1 12 层', businessHours: '09:00-21:00' },
+          data: { name: '太极空间·望京店', address: '北京市朝阳区望京 SOHO T1 12 层', businessHours: '09:00-21:00', staffId: null },
         }),
         tx.store.create({
-          data: { name: '太极空间·国贸店', address: '北京市朝阳区建国门外大街 1 号', businessHours: '10:00-22:00' },
+          data: { name: '太极空间·国贸店', address: '北京市朝阳区建国门外大街 1 号', businessHours: '10:00-22:00', staffId: null },
         }),
       ])
 

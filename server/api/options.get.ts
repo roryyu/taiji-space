@@ -2,7 +2,7 @@
 // 一次返回店铺/教师/会员/课程精简列表，供前端各表单选择器复用
 export default defineEventHandler(async () => {
   const [stores, staffs, members, courses] = await Promise.all([
-    prisma.store.findMany({ select: { id: true, name: true }, orderBy: { id: 'asc' } }),
+    prisma.store.findMany({ select: { id: true, name: true, staffId: true }, orderBy: { id: 'asc' } }),
     prisma.staff.findMany({
       select: { id: true, name: true, type: true },
       orderBy: { id: 'asc' },

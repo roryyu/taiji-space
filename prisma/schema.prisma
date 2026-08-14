@@ -66,10 +66,14 @@ model Store {
   name          String   @unique
   address       String
   businessHours String // 经营时段，如 "09:00-21:00"
+  staffId       Int? // 店长（关联 Staff，type 为 MANAGER）
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  cards MembershipCard[]
+  manager Staff?         @relation(fields: [staffId], references: [id])
+  cards   MembershipCard[]
+
+  @@index([staffId])
 }
 
 /// 员工
@@ -84,7 +88,9 @@ model Staff {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  cards MembershipCard[]
+  cards   MembershipCard[] @relation("CoachCards")
+  created MembershipCard[] @relation("CreatorCards")
+  stores  Store[] // 作为店长管理的店铺
 }
 
 /// 会员信息
@@ -111,6 +117,7 @@ model MembershipCard {
   storeId       Int      @default(1) // 所属门店
   courseId      Int      @default(1) // 关联课程
   coachId       Int      @default(1) // 关联教练
+  staffId       Int? // 创建员工（MANAGER/ADMINISTRATOR）
   totalAmount   Int      @default(0) // 总金额（元）
   totalSessions Int      @default(0) // 总次数
   giftSessions  Int      @default(0) // 赠送次数
@@ -122,13 +129,15 @@ model MembershipCard {
   member       Member            @relation(fields: [memberId], references: [id])
   store        Store             @relation(fields: [storeId], references: [id])
   course       Course            @relation(fields: [courseId], references: [id])
-  coach        Staff             @relation(fields: [coachId], references: [id])
+  coach        Staff             @relation("CoachCards", fields: [coachId], references: [id])
+  creator      Staff?            @relation("CreatorCards", fields: [staffId], references: [id])
   transactions CardTransaction[]
 
   @@index([memberId])
   @@index([storeId])
   @@index([courseId])
   @@index([coachId])
+  @@index([staffId])
 }
 
 /// 会员卡流水

@@ -50,7 +50,7 @@ export default defineNuxtConfig({
       },
       pages: { login: '/login' },
       session: {
-        dataType: { id: 'number', username: 'string', name: 'string' },
+        dataType: { id: 'number', username: 'string', name: 'string', type: 'string' },
       },
     },
     // 全局路由守卫：未登录一律重定向到 /login

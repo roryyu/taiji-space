@@ -8,10 +8,25 @@ definePageMeta({
   auth: { unauthenticatedOnly: true, navigateAuthenticatedTo: '/' },
 })
 
-const { signIn } = useAuth()
+const { signIn, data: session } = useAuth()
+const router = useRouter()
 
 const form = reactive({ username: '', password: '' })
 const loading = ref(false)
+
+/** 根据用户角色获取默认首页 */
+function getDefaultHome(role?: string): string {
+  switch (role) {
+    case 'TEACHER':
+      return '/schedules'
+    case 'MANAGER':
+      return '/'
+    case 'ADMINISTRATOR':
+      return '/'
+    default:
+      return '/'
+  }
+}
 
 /** 提交登录 */
 async function handleLogin() {
@@ -21,7 +36,11 @@ async function handleLogin() {
   }
   loading.value = true
   try {
-    await signIn({ username: form.username, password: form.password }, { callbackUrl: '/' })
+    await signIn({ username: form.username, password: form.password }, { redirect: false })
+    // 登录成功后，根据用户角色跳转到对应的默认页面
+    await nextTick()
+    const homePath = getDefaultHome(session.value?.type)
+    await router.push(homePath)
   }
   catch {
     ElMessage.error('用户名或密码错误')

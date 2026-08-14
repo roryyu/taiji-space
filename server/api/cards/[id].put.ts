@@ -5,6 +5,7 @@ const schema = z.object({
   storeId: z.number().int().positive('请选择门店'),
   courseId: z.number().int().positive('请选择课程'),
   coachId: z.number().int().positive('请选择教练'),
+  staffId: z.number().int().positive().optional(), // ADMINISTRATOR 可修改负责员工
   totalAmount: z.number().int().min(0, '总金额不能为负'),
   totalSessions: z.number().int().min(0, '总次数不能为负'),
   giftSessions: z.number().int().min(0, '赠送次数不能为负'),
@@ -16,8 +17,18 @@ export default defineEventHandler(async (event) => {
   const id = parseId(event)
   const data = await parseBody(event, schema)
 
-  const card = await prisma.membershipCard.findUnique({ where: { id }, select: { id: true } })
+  // 获取当前登录员工信息
+  const auth = event.context.auth as AuthPayload | undefined
+
+  const card = await prisma.membershipCard.findUnique({ where: { id }, select: { id: true, staffId: true } })
   if (!card) throw createError({ statusCode: 404, message: '会员卡不存在' })
+
+  // 权限校验：ADMINISTRATOR 可编辑所有，MANAGER 只能编辑自己创建的数据
+  if (!auth) throw createError({ statusCode: 401, message: '未登录' })
+
+  if (auth.type === 'MANAGER' && card.staffId !== auth.id) {
+    throw createError({ statusCode: 403, message: '只能编辑自己创建的会员卡' })
+  }
 
   // 归一化为业务日起止
   const validFrom = startOfDayCST(data.validFrom)
@@ -42,6 +53,7 @@ export default defineEventHandler(async (event) => {
       storeId: data.storeId,
       courseId: data.courseId,
       coachId: data.coachId,
+      staffId: data.staffId,
       totalAmount: data.totalAmount,
       totalSessions: data.totalSessions,
       giftSessions: data.giftSessions,

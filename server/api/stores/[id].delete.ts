@@ -5,13 +5,11 @@ export default defineEventHandler(async (event) => {
 
   const store = await prisma.store.findUnique({
     where: { id },
-    include: { _count: { select: { members: true, courses: true } } },
+    include: { _count: { select: { cards: true } } },
   })
   if (!store) throw createError({ statusCode: 404, message: '店铺不存在' })
-  if (store._count.members > 0)
-    throw createError({ statusCode: 400, message: '该店铺下存在会员，无法删除' })
-  if (store._count.courses > 0)
-    throw createError({ statusCode: 400, message: '该店铺下存在课程，无法删除' })
+  if (store._count.cards > 0)
+    throw createError({ statusCode: 400, message: '该店铺下存在会员卡，无法删除' })
 
   await prisma.store.delete({ where: { id } })
   return { ok: true }

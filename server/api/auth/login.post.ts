@@ -47,6 +47,6 @@ export default defineEventHandler(async (event) => {
   }
 
   failures.delete(lockKey)
-  const token = signToken({ id: user.id, username: user.account, name: user.name })
+  const token = signToken({ id: user.id, username: user.account, name: user.name, type: user.type })
   return { token }
 })

@@ -16,28 +16,52 @@ import {
 } from '@element-plus/icons-vue'
 
 const route = useRoute()
+const router = useRouter()
 const { data: session, signOut } = useAuth()
 
 /** 侧边栏折叠状态 */
 const collapsed = ref(false)
 
-/** 菜单配置：路径 + 名称 + 图标 */
-const menus = [
-  { path: '/', title: '工作台', icon: DataAnalysis },
-  { path: '/members', title: '会员信息', icon: User },
-  { path: '/cards', title: '会员卡', icon: CreditCard },
-  { path: '/courses', title: '课程管理', icon: Reading },
-  { path: '/schedules', title: '课程排期', icon: Calendar },
-  { path: '/bookings', title: '课程预约', icon: Tickets },
-  { path: '/reviews', title: '课程评价', icon: ChatDotSquare },
-  { path: '/staffs', title: '员工管理', icon: Avatar },
-  { path: '/analytics', title: '运营分析', icon: TrendCharts },
-  { path: '/settings', title: '系统配置', icon: Setting },
+/** 菜单配置：路径 + 名称 + 图标 + 权限 */
+const allMenus = [
+  { path: '/', title: '工作台', icon: DataAnalysis, roles: ['MANAGER', 'ADMINISTRATOR'] },
+  { path: '/members', title: '会员信息', icon: User, roles: ['MANAGER', 'ADMINISTRATOR'] },
+  { path: '/cards', title: '会员卡', icon: CreditCard, roles: ['MANAGER', 'ADMINISTRATOR'] },
+  { path: '/courses', title: '课程管理', icon: Reading, roles: ['MANAGER', 'ADMINISTRATOR'] },
+  { path: '/schedules', title: '课程排期', icon: Calendar, roles: ['TEACHER', 'MANAGER', 'ADMINISTRATOR'] },
+  { path: '/bookings', title: '课程预约', icon: Tickets, roles: ['TEACHER', 'MANAGER', 'ADMINISTRATOR'] },
+  { path: '/reviews', title: '课程评价', icon: ChatDotSquare, roles: ['MANAGER', 'ADMINISTRATOR'] },
+  { path: '/staffs', title: '员工管理', icon: Avatar, roles: ['ADMINISTRATOR'] },
+  { path: '/analytics', title: '运营分析', icon: TrendCharts, roles: ['MANAGER', 'ADMINISTRATOR'] },
+  { path: '/settings', title: '系统配置', icon: Setting, roles: ['ADMINISTRATOR'] },
 ]
+
+/** 检查用户是否有权限访问当前路径 */
+function hasPermission(path: string, role: string): boolean {
+  const menu = allMenus.find(m => m.path === path)
+  return menu ? menu.roles.includes(role) : true
+}
+
+/** 根据用户角色过滤菜单 */
+const menus = computed(() => {
+  const userRole = session.value?.type || 'TEACHER'
+  return allMenus.filter(menu => menu.roles.includes(userRole))
+})
+
+/** TEACHER角色访问无权限页面时重定向到课程排期 */
+if (import.meta.client) {
+  watch(() => [session.value?.type, route.path], ([type, path]) => {
+    if (type && !hasPermission(path, type)) {
+      const userRole = type as string
+      const defaultPath = userRole === 'TEACHER' ? '/schedules' : '/'
+      router.replace(defaultPath)
+    }
+  }, { immediate: true })
+}
 
 /** 当前页面标题（顶栏面包屑用） */
 const currentTitle = computed(
-  () => menus.find((m) => m.path === route.path)?.title ?? '太极空间',
+  () => menus.value.find((m) => m.path === route.path)?.title ?? '太极空间',
 )
 
 /** 退出登录 */

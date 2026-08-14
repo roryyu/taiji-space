@@ -10,6 +10,7 @@ interface CardRow {
   storeId: number
   courseId: number
   coachId: number
+  staffId: number | null
   totalAmount: number
   totalSessions: number
   giftSessions: number
@@ -19,6 +20,7 @@ interface CardRow {
   store: { id: number; name: string }
   course: { id: number; name: string }
   coach: { id: number; name: string }
+  creator: { id: number; name: string } | null
 }
 
 /** 卡流水记录 */
@@ -32,11 +34,31 @@ interface TxRow {
 
 /** 选项数据 */
 interface OptionItem { id: number; name: string }
+interface StoreOption { id: number; name: string; staffId: number | null }
+interface StaffOption { id: number; name: string; type: string }
 interface MemberOption { id: number; name: string; phone: string }
 
 const asRow = (row: unknown) => row as CardRow
 
 const { request } = useApi()
+const { data: session } = useAuth()
+
+// 当前用户是否为管理员（管理员不可编辑）
+const isAdmin = computed(() => session.value?.type === 'ADMINISTRATOR')
+// 当前用户是否为经理
+const isManager = computed(() => session.value?.type === 'MANAGER')
+// 当前用户ID
+const currentUserId = computed(() => session.value?.id)
+
+/** 判断是否可以编辑该卡片 */
+function canEdit(row: CardRow): boolean {
+  // ADMINISTRATOR 可编辑所有
+  if (isAdmin.value) return true
+  // MANAGER 只能编辑自己创建的
+  if (isManager.value) return row.staffId === currentUserId.value
+  // 其他角色不可编辑
+  return false
+}
 
 // ---------- 列表状态 ----------
 const loading = ref(false)
@@ -47,9 +69,9 @@ const pageSize = ref(10)
 const filters = reactive({ keyword: '', storeId: undefined as number | undefined, courseId: undefined as number | undefined, coachId: undefined as number | undefined })
 
 // 下拉选项
-const stores = ref<OptionItem[]>([])
+const stores = ref<StoreOption[]>([])
 const courses = ref<OptionItem[]>([])
-const staff = ref<OptionItem[]>([])
+const staff = ref<StaffOption[]>([])
 const members = ref<MemberOption[]>([])
 
 async function fetchList() {
@@ -77,9 +99,9 @@ async function fetchList() {
 /** 拉取下拉选项 */
 async function fetchOptions() {
   try {
-    const res = await request<{ stores: OptionItem[]; staff: OptionItem[]; members: MemberOption[]; courses: (OptionItem & { storeId: number; staffId: number })[] }>('/api/options')
+    const res = await request<{ stores: StoreOption[]; staffs: StaffOption[]; members: MemberOption[]; courses: (OptionItem & { storeId: number; staffId: number })[] }>('/api/options')
     stores.value = res.stores
-    staff.value = res.staff
+    staff.value = res.staffs
     members.value = res.members
     courses.value = res.courses
   }
@@ -104,11 +126,28 @@ const createForm = reactive({
   storeId: undefined as number | undefined,
   courseId: undefined as number | undefined,
   coachId: undefined as number | undefined,
+  createStaffId: undefined as number | undefined, // ADMINISTRATOR 可选择 MANAGER
   totalAmount: 0,
   totalSessions: 0,
   giftSessions: 0,
   range: [] as string[],
 })
+
+/** 监听门店选择，自动填充店长到负责员工（仅 ADMINISTRATOR） */
+watch(() => createForm.storeId, (storeId) => {
+  if (isAdmin.value && storeId) {
+    const store = stores.value.find(s => s.id === storeId)
+    if (store?.staffId) {
+      createForm.createStaffId = store.staffId
+    }
+  }
+})
+
+/** 筛选出 TEACHER 类型的员工选项（授课教师） */
+const teacherOptions = computed(() => (staff.value || []).filter(s => s.type === 'TEACHER'))
+
+/** 筛选出 MANAGER 类型的员工选项 */
+const managerOptions = computed(() => (staff.value || []).filter(s => s.type === 'MANAGER'))
 
 // ---------- 会员远程搜索 ----------
 const memberLoading = ref(false)
@@ -136,7 +175,7 @@ async function openCreate() {
   createVisible.value = true
   Object.assign(createForm, {
     memberId: undefined, storeId: undefined, courseId: undefined, coachId: undefined,
-    totalAmount: 0, totalSessions: 0, giftSessions: 0, range: [],
+    createStaffId: undefined, totalAmount: 0, totalSessions: 0, giftSessions: 0, range: [],
   })
   if (!stores.value.length) {
     await fetchOptions()
@@ -151,6 +190,11 @@ async function handleCreate() {
     ElMessage.warning('请填写完整信息')
     return
   }
+  // ADMINISTRATOR 必须选择一个 MANAGER
+  if (isAdmin.value && !createForm.createStaffId) {
+    ElMessage.warning('请选择负责员工')
+    return
+  }
   saving.value = true
   try {
     await request('/api/cards', {
@@ -160,6 +204,7 @@ async function handleCreate() {
         storeId: createForm.storeId,
         courseId: createForm.courseId,
         coachId: createForm.coachId,
+        staffId: isAdmin.value ? createForm.createStaffId : undefined,
         totalAmount: createForm.totalAmount,
         totalSessions: createForm.totalSessions,
         giftSessions: createForm.giftSessions,
@@ -184,29 +229,50 @@ const editForm = reactive({
   storeId: undefined as number | undefined,
   courseId: undefined as number | undefined,
   coachId: undefined as number | undefined,
+  staffId: undefined as number | undefined, // ADMINISTRATOR 可修改负责员工
   totalAmount: 0,
   totalSessions: 0,
   giftSessions: 0,
   range: [] as string[],
 })
 
-function openEdit(row: CardRow) {
+/** 监听门店选择，自动填充店长到负责员工（仅 ADMINISTRATOR） */
+watch(() => editForm.storeId, (storeId) => {
+  if (isAdmin.value && storeId) {
+    const store = stores.value.find(s => s.id === storeId)
+    if (store?.staffId) {
+      editForm.staffId = store.staffId
+    }
+  }
+})
+
+async function openEdit(row: CardRow) {
   editingId.value = row.id
   Object.assign(editForm, {
     storeId: row.storeId,
     courseId: row.courseId,
     coachId: row.coachId,
+    staffId: row.staffId ?? undefined,
     totalAmount: row.totalAmount,
     totalSessions: row.totalSessions,
     giftSessions: row.giftSessions,
     range: [fmtDate(row.validFrom), fmtDate(row.validTo)],
   })
   editVisible.value = true
+  // 确保选项数据已加载
+  if (!stores.value.length) {
+    await fetchOptions()
+  }
 }
 
 async function handleEdit() {
   if (!editingId.value || !editForm.storeId || !editForm.courseId || !editForm.coachId || editForm.range.length !== 2) {
     ElMessage.warning('请填写完整信息')
+    return
+  }
+  // ADMINISTRATOR 必须指定负责员工
+  if (isAdmin.value && !editForm.staffId) {
+    ElMessage.warning('请选择负责员工')
     return
   }
   saving.value = true
@@ -217,6 +283,7 @@ async function handleEdit() {
         storeId: editForm.storeId,
         courseId: editForm.courseId,
         coachId: editForm.coachId,
+        staffId: isAdmin.value ? editForm.staffId : undefined,
         totalAmount: editForm.totalAmount,
         totalSessions: editForm.totalSessions,
         giftSessions: editForm.giftSessions,
@@ -323,8 +390,11 @@ onMounted(() => {
       <el-table-column label="课程" width="120">
         <template #default="{ row }">{{ row.course?.name }}</template>
       </el-table-column>
-      <el-table-column label="员工" width="100">
+      <el-table-column label="授课教师" width="100">
         <template #default="{ row }">{{ row.coach?.name }}</template>
+      </el-table-column>
+      <el-table-column label="创建人" width="100">
+        <template #default="{ row }">{{ row.creator?.name ?? '-' }}</template>
       </el-table-column>
       <el-table-column label="总金额" width="90">
         <template #default="{ row }">{{ row.totalAmount }} 元</template>
@@ -338,11 +408,9 @@ onMounted(() => {
       <el-table-column label="有效期" width="200">
         <template #default="{ row }">{{ fmtDate(row.validFrom) }} ~ {{ fmtDate(row.validTo) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="100" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="openEdit(asRow(row))">编辑</el-button>
-          <el-button link type="primary" @click="openExtend(asRow(row))">延期</el-button>
-          <el-button link @click="openTransactions(asRow(row))">流水</el-button>
+          <el-button v-if="canEdit(asRow(row))" link type="primary" @click="openEdit(asRow(row))">编辑</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -383,9 +451,14 @@ onMounted(() => {
             <el-option v-for="c in courses" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="员工" required>
-          <el-select v-model="createForm.coachId" placeholder="请选择员工">
-            <el-option v-for="t in staff" :key="t.id" :label="t.name" :value="t.id" />
+        <el-form-item label="授课教师" required>
+          <el-select v-model="createForm.coachId" placeholder="请选择授课教师">
+            <el-option v-for="t in teacherOptions" :key="t.id" :label="t.name" :value="t.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="isAdmin" label="负责员工" required>
+          <el-select v-model="createForm.createStaffId" placeholder="请选择负责员工">
+            <el-option v-for="m in managerOptions" :key="m.id" :label="m.name" :value="m.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="总金额">
@@ -424,9 +497,14 @@ onMounted(() => {
             <el-option v-for="c in courses" :key="c.id" :label="c.name" :value="c.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="员工" required>
-          <el-select v-model="editForm.coachId" placeholder="请选择员工">
-            <el-option v-for="t in staff" :key="t.id" :label="t.name" :value="t.id" />
+        <el-form-item label="授课教师" required>
+          <el-select v-model="editForm.coachId" placeholder="请选择授课教师">
+            <el-option v-for="t in teacherOptions" :key="t.id" :label="t.name" :value="t.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="isAdmin" label="负责员工" required>
+          <el-select v-model="editForm.staffId" placeholder="请选择负责员工">
+            <el-option v-for="m in managerOptions" :key="m.id" :label="m.name" :value="m.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="总金额">
