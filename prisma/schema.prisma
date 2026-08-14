@@ -1,0 +1,220 @@
+// 太极空间 - 数据模型定义
+// Prisma 7：使用 prisma-client 生成器 + @prisma/adapter-pg 驱动适配器
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+  // 生成代码内部使用 .ts 扩展名导入，便于 Node 原生类型剥离直接运行（如 seed 脚本）
+  importFileExtension = "ts"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------- 枚举 ----------
+
+/// 获客渠道
+enum AcquisitionChannel {
+  WALK_IN // 到店咨询
+  REFERRAL // 老会员转介绍
+  ONLINE // 线上引流
+  ACTIVITY // 活动获客
+  OTHER // 其他
+}
+
+/// 卡流水类型
+enum TransactionType {
+  RECHARGE // 充值
+  DEDUCT // 扣减
+  EXTEND // 有效期延长
+}
+
+/// 员工类型
+enum StaffType {
+  TEACHER // 教练
+  MANAGER // 经理
+  ADMINISTRATOR // 管理员
+}
+
+/// 课程阶段
+enum CourseStage {
+  BASIC // 基础
+  INTERMEDIATE // 进阶
+  ADVANCED // 高级
+}
+
+/// 排期状态
+enum ScheduleStatus {
+  OPEN // 开放预约
+  FINISHED // 已结课
+  CANCELLED // 已取消
+}
+
+/// 预约状态
+enum BookingStatus {
+  BOOKED // 已预约
+  CANCELLED // 已取消
+  COMPLETED // 已完成
+}
+
+// ---------- 模型 ----------
+
+/// 店铺（系统配置-店铺）
+model Store {
+  id            Int      @id @default(autoincrement())
+  name          String   @unique
+  address       String
+  businessHours String // 经营时段，如 "09:00-21:00"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  cards MembershipCard[]
+}
+
+/// 员工
+model Staff {
+  id            Int      @id @default(autoincrement())
+  name          String
+  qualification String? // 资质
+  styleTags     String[] // 风格标签
+  account       String   @unique // 登录账号
+  password      String // bcrypt 哈希
+  type          StaffType @default(TEACHER) // 员工类型
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  cards MembershipCard[]
+}
+
+/// 会员信息
+model Member {
+  id             Int                @id @default(autoincrement())
+  name           String // 顾客姓名
+  phone          String             @unique // 手机号
+  channel        AcquisitionChannel @default(WALK_IN) // 获客渠道
+  preferenceTags String[] // 标签-课程偏好
+  remark         String? // 标签-备注
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  cards    MembershipCard[]
+  bookings Booking[]
+  reviews  CourseReview[]
+}
+
+/// 会员卡
+model MembershipCard {
+  id            Int      @id @default(autoincrement())
+  cardNo        String   @unique // 卡号（自动生成）
+  memberId      Int
+  storeId       Int      @default(1) // 所属门店
+  courseId      Int      @default(1) // 关联课程
+  coachId       Int      @default(1) // 关联教练
+  totalAmount   Int      @default(0) // 总金额（元）
+  totalSessions Int      @default(0) // 总次数
+  giftSessions  Int      @default(0) // 赠送次数
+  validFrom     DateTime // 有效期起
+  validTo       DateTime // 有效期止
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  member       Member            @relation(fields: [memberId], references: [id])
+  store        Store             @relation(fields: [storeId], references: [id])
+  course       Course            @relation(fields: [courseId], references: [id])
+  coach        Staff             @relation(fields: [coachId], references: [id])
+  transactions CardTransaction[]
+
+  @@index([memberId])
+  @@index([storeId])
+  @@index([courseId])
+  @@index([coachId])
+}
+
+/// 会员卡流水
+model CardTransaction {
+  id        Int             @id @default(autoincrement())
+  cardId    Int
+  type      TransactionType
+  amount    Decimal         @default(0) @db.Decimal(12, 2)
+  remark    String?
+  createdAt DateTime        @default(now())
+
+  card MembershipCard @relation(fields: [cardId], references: [id])
+
+  @@index([cardId])
+}
+
+/// 课程
+model Course {
+  id          Int      @id @default(autoincrement())
+  name        String // 课程名称
+  description String? // 课程描述
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  schedules CourseSchedule[]
+  reviews   CourseReview[]
+  cards     MembershipCard[]
+}
+
+/// 课程排期
+model CourseSchedule {
+  id        Int            @id @default(autoincrement())
+  courseId  Int
+  stage     CourseStage // 课程阶段
+  startTime DateTime // 课程时段-开始
+  endTime   DateTime // 课程时段-结束
+  status    ScheduleStatus @default(OPEN)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  course   Course    @relation(fields: [courseId], references: [id])
+  bookings Booking[]
+
+  @@index([courseId])
+  @@index([startTime])
+}
+
+/// 课程预约
+model Booking {
+  id         Int           @id @default(autoincrement())
+  memberId   Int // 会员
+  scheduleId Int // 排期（含课程阶段、时间）
+  status     BookingStatus @default(BOOKED)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  member   Member         @relation(fields: [memberId], references: [id])
+  schedule CourseSchedule @relation(fields: [scheduleId], references: [id])
+
+  // 同一会员对同一排期只允许一条预约记录，防止重复预约
+  @@unique([memberId, scheduleId])
+  @@index([scheduleId])
+}
+
+/// 课程评价
+model CourseReview {
+  id         Int      @id @default(autoincrement())
+  memberId   Int // 会员
+  courseId   Int // 课程
+  rating     Int // 评分 1-5
+  suggestion String? // 建议
+  createdAt  DateTime @default(now())
+
+  member Member @relation(fields: [memberId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  // 同一会员对同一课程只允许一条评价
+  @@unique([memberId, courseId])
+  @@index([courseId])
+  @@index([memberId])
+}
+
+/// 系统参数（key-value）
+model SystemParam {
+  key         String   @id
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
