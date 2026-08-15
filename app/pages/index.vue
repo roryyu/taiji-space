@@ -6,7 +6,6 @@ interface Overview {
   activeCardCount: number
   courseCount: number
   todayScheduleCount: number
-  todayBookingCount: number
 }
 
 const { request } = useApi()
@@ -20,7 +19,6 @@ const cards = computed(() => [
   { label: '有效会员卡', value: overview.value?.activeCardCount ?? 0, color: '#52c41a' },
   { label: '课程总数', value: overview.value?.courseCount ?? 0, color: '#722ed1' },
   { label: '今日排期', value: overview.value?.todayScheduleCount ?? 0, color: '#fa8c16' },
-  { label: '今日预约', value: overview.value?.todayBookingCount ?? 0, color: '#eb2f96' },
 ])
 
 onMounted(async () => {
@@ -53,7 +51,7 @@ onMounted(async () => {
 <style scoped>
 .stat-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 16px;
 }

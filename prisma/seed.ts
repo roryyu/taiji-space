@@ -128,39 +128,33 @@ async function main() {
         })
       }
 
-      // 2.6 排期（过去已结课 + 未来开放预约）
+      // 2.6 排期（关联到会员卡和会员）
       const day = 24 * 3600 * 1000
       const at = (offsetDays: number, hour: number) => {
         const d = new Date(now.getTime() + offsetDays * day)
         d.setHours(hour, 0, 0, 0)
         return d
       }
-      const sch1 = await tx.courseSchedule.create({
-        data: { courseId: c1.id, stage: 'BASIC', startTime: at(-7, 10), endTime: at(-7, 11), status: 'FINISHED' },
-      })
-      const sch2 = await tx.courseSchedule.create({
-        data: { courseId: c2.id, stage: 'BASIC', startTime: at(-3, 19), endTime: at(-3, 20), status: 'FINISHED' },
-      })
-      const sch3 = await tx.courseSchedule.create({
-        data: { courseId: c1.id, stage: 'INTERMEDIATE', startTime: at(2, 10), endTime: at(2, 11), status: 'OPEN' },
-      })
-      const sch4 = await tx.courseSchedule.create({
-        data: { courseId: c3.id, stage: 'BASIC', startTime: at(3, 15), endTime: at(3, 16), status: 'OPEN' },
+
+      // 获取会员卡信息用于关联排期
+      const cards = await tx.membershipCard.findMany({
+        where: { memberId: { in: members.slice(0, 4).map(m => m.id) } },
+        select: { id: true, memberId: true, courseId: true },
       })
 
-      // 2.7 预约（已完成 + 进行中）
-      await tx.booking.createMany({
-        data: [
-          { memberId: members[0]!.id, scheduleId: sch1.id, status: 'COMPLETED' },
-          { memberId: members[1]!.id, scheduleId: sch1.id, status: 'COMPLETED' },
-          { memberId: members[1]!.id, scheduleId: sch2.id, status: 'COMPLETED' },
-          { memberId: members[2]!.id, scheduleId: sch2.id, status: 'CANCELLED' },
-          { memberId: members[0]!.id, scheduleId: sch3.id, status: 'BOOKED' },
-          { memberId: members[4]!.id, scheduleId: sch4.id, status: 'BOOKED' },
-        ],
-      })
+      if (cards.length >= 4) {
+        // 为每个会员卡创建排期
+        await tx.courseSchedule.createMany({
+          data: [
+            { cardId: cards[0]!.id, memberId: cards[0]!.memberId, courseId: cards[0]!.courseId, startTime: at(-7, 10), endTime: at(-7, 11) },
+            { cardId: cards[0]!.id, memberId: cards[0]!.memberId, courseId: cards[0]!.courseId, startTime: at(-3, 19), endTime: at(-3, 20) },
+            { cardId: cards[1]!.id, memberId: cards[1]!.memberId, courseId: cards[1]!.courseId, startTime: at(2, 10), endTime: at(2, 11) },
+            { cardId: cards[2]!.id, memberId: cards[2]!.memberId, courseId: cards[2]!.courseId, startTime: at(3, 15), endTime: at(3, 16) },
+          ],
+        })
+      }
 
-      // 2.8 课程评价
+      // 2.7 课程评价
       await tx.courseReview.createMany({
         data: [
           { memberId: members[0]!.id, courseId: c1.id, rating: 5, suggestion: '陈老师讲解细致，希望增加推手环节。' },

@@ -37,25 +37,10 @@ enum StaffType {
   ADMINISTRATOR // 管理员
 }
 
-/// 课程阶段
-enum CourseStage {
-  BASIC // 基础
-  INTERMEDIATE // 进阶
-  ADVANCED // 高级
-}
-
 /// 排期状态
 enum ScheduleStatus {
-  OPEN // 开放预约
-  FINISHED // 已结课
-  CANCELLED // 已取消
-}
-
-/// 预约状态
-enum BookingStatus {
-  BOOKED // 已预约
-  CANCELLED // 已取消
-  COMPLETED // 已完成
+  PENDING // 未上课
+  COMPLETED // 已上课
 }
 
 // ---------- 模型 ----------
@@ -104,9 +89,9 @@ model Member {
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
 
-  cards    MembershipCard[]
-  bookings Booking[]
-  reviews  CourseReview[]
+  cards     MembershipCard[]
+  reviews   CourseReview[]
+  schedules CourseSchedule[]
 }
 
 /// 会员卡
@@ -132,6 +117,7 @@ model MembershipCard {
   coach        Staff             @relation("CoachCards", fields: [coachId], references: [id])
   creator      Staff?            @relation("CreatorCards", fields: [staffId], references: [id])
   transactions CardTransaction[]
+  schedules    CourseSchedule[]
 
   @@index([memberId])
   @@index([storeId])
@@ -170,37 +156,26 @@ model Course {
 /// 课程排期
 model CourseSchedule {
   id        Int            @id @default(autoincrement())
-  courseId  Int
-  stage     CourseStage // 课程阶段
+  cardId    Int // 关联会员卡
+  memberId  Int // 关联会员
+  courseId  Int // 关联课程
   startTime DateTime // 课程时段-开始
   endTime   DateTime // 课程时段-结束
-  status    ScheduleStatus @default(OPEN)
+  status    ScheduleStatus @default(PENDING) // 排期状态
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
 
-  course   Course    @relation(fields: [courseId], references: [id])
-  bookings Booking[]
+  card   MembershipCard @relation(fields: [cardId], references: [id])
+  member Member         @relation(fields: [memberId], references: [id])
+  course Course         @relation(fields: [courseId], references: [id])
 
+  @@index([cardId])
+  @@index([memberId])
   @@index([courseId])
   @@index([startTime])
 }
 
-/// 课程预约
-model Booking {
-  id         Int           @id @default(autoincrement())
-  memberId   Int // 会员
-  scheduleId Int // 排期（含课程阶段、时间）
-  status     BookingStatus @default(BOOKED)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
 
-  member   Member         @relation(fields: [memberId], references: [id])
-  schedule CourseSchedule @relation(fields: [scheduleId], references: [id])
-
-  // 同一会员对同一排期只允许一条预约记录，防止重复预约
-  @@unique([memberId, scheduleId])
-  @@index([scheduleId])
-}
 
 /// 课程评价
 model CourseReview {

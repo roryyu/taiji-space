@@ -1,49 +1,134 @@
-<!-- 课程排期：增删改查（课程阶段 + 课程时段） -->
+<!-- 课程排期：日历视图 -->
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, computed, onMounted, nextTick } from 'vue'
 
-/** 排期行数据（对应 /api/schedules 响应） */
-interface ScheduleRow {
+/** 排期数据 */
+interface ScheduleItem {
   id: number
+  cardId: number
+  memberId: number
   courseId: number
-  stage: keyof typeof StageLabels
   startTime: string
   endTime: string
-  status: keyof typeof ScheduleStatusLabels
-  course: { id: number; name: string; staff: { id: number; name: string } }
-  _count: { bookings: number }
+  status: 'PENDING' | 'COMPLETED'
+  course: { id: number; name: string }
+  card: { id: number; cardNo: string; coachId: number }
+  member: { id: number; name: string }
 }
-
-interface CourseOption { id: number; name: string }
-
-const asRow = (row: unknown) => row as ScheduleRow
 
 const { request } = useApi()
 
-// ---------- 列表状态 ----------
+// ---------- 当前登录用户 ----------
+const currentUser = ref<{ id: number; name: string; type: string } | null>(null)
+
+async function fetchCurrentUser() {
+  try {
+    const res = await request<{ id: number; name: string; type: string }>('/api/auth/session')
+    currentUser.value = res
+  }
+  catch { /* 已统一提示 */ }
+}
+
+// ---------- 日历状态 ----------
+const currentDate = ref(new Date())
+const schedules = ref<ScheduleItem[]>([])
 const loading = ref(false)
-const items = ref<ScheduleRow[]>([])
-const total = ref(0)
-const page = ref(1)
-const pageSize = ref(10)
-const filters = reactive({ courseId: undefined as number | undefined, stage: '', status: '' })
+const calendarWrapper = ref<HTMLElement | null>(null)
 
-const courses = ref<CourseOption[]>([])
+// 获取本周一
+function getMonday(date: Date): Date {
+  const d = new Date(date)
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  return new Date(d.setDate(diff))
+}
 
-async function fetchList() {
+// 获取一周的日期列表
+const weekDates = computed(() => {
+  const monday = getMonday(currentDate.value)
+  const dates = []
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(monday)
+    date.setDate(monday.getDate() + i)
+    dates.push(date)
+  }
+  return dates
+})
+
+// 格式化日期为 YYYY-MM-DD
+function formatDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// 获取一周的起止日期
+const weekRange = computed(() => {
+  const dates = weekDates.value
+  return {
+    start: formatDate(dates[0]),
+    end: formatDate(dates[6]),
+  }
+})
+
+// 星期几的名称
+const weekDayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+
+// 24小时时间段
+const timeSlots = Array.from({ length: 24 }, (_, i) => i)
+
+// ---------- 切换日期 ----------
+function prevWeek() {
+  const d = new Date(currentDate.value)
+  d.setDate(d.getDate() - 7)
+  currentDate.value = d
+  fetchSchedules()
+}
+
+function nextWeek() {
+  const d = new Date(currentDate.value)
+  d.setDate(d.getDate() + 7)
+  currentDate.value = d
+  fetchSchedules()
+}
+
+function goToToday() {
+  currentDate.value = new Date()
+  fetchSchedules()
+}
+
+// 切换年月
+const selectedYear = ref(new Date().getFullYear())
+const selectedMonth = ref(new Date().getMonth() + 1)
+
+function switchToMonth() {
+  currentDate.value = new Date(selectedYear.value, selectedMonth.value - 1, 1)
+  fetchSchedules()
+}
+
+// 年份选项
+const yearOptions = computed(() => {
+  const currentYear = new Date().getFullYear()
+  return Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
+})
+
+// 月份选项
+const monthOptions = Array.from({ length: 12 }, (_, i) => i + 1)
+
+// ---------- 获取排期数据 ----------
+async function fetchSchedules() {
   loading.value = true
   try {
-    const res = await request<{ items: ScheduleRow[]; total: number }>('/api/schedules', {
+    const res = await request<{ items: ScheduleItem[] }>('/api/schedules/calendar', {
       query: {
-        page: page.value,
-        pageSize: pageSize.value,
-        courseId: filters.courseId || undefined,
-        stage: filters.stage || undefined,
-        status: filters.status || undefined,
+        startDate: weekRange.value.start,
+        endDate: weekRange.value.end,
+        staffId: currentUser.value?.id || undefined,
       },
     })
-    items.value = res.items
-    total.value = res.total
+    schedules.value = res.items
   }
   catch { /* 已统一提示 */ }
   finally {
@@ -51,223 +136,417 @@ async function fetchList() {
   }
 }
 
-async function fetchOptions() {
-  try {
-    const res = await request<{ courses: CourseOption[] }>('/api/options')
-    courses.value = res.courses
+// ---------- 日历单元格数据 ----------
+interface CalendarCell {
+  date: Date
+  hour: number
+  schedule: ScheduleItem | null
+}
+
+// 生成日历网格数据
+const calendarGrid = computed(() => {
+  const grid: CalendarCell[][] = []
+
+  // 按小时遍历
+  for (let hour = 0; hour < 24; hour++) {
+    const row: CalendarCell[] = []
+
+    // 按星期几遍历
+    for (let day = 0; day < 7; day++) {
+      const date = weekDates.value[day]
+      const cellDate = new Date(date)
+      cellDate.setHours(hour, 0, 0, 0)
+
+      // 查找该时间段的排期
+      const schedule = schedules.value.find((s) => {
+        const startTime = new Date(s.startTime)
+        const endTime = new Date(s.endTime)
+        return startTime <= cellDate && endTime > cellDate
+      })
+
+      row.push({
+        date: cellDate,
+        hour,
+        schedule: schedule || null,
+      })
+    }
+
+    grid.push(row)
   }
-  catch { /* 已统一提示 */ }
-}
 
-function handleSearch() {
-  page.value = 1
-  fetchList()
-}
-
-/** 时间格式化（YYYY-MM-DD HH:mm） */
-function fmtTime(v: string) {
-  return new Date(v).toLocaleString('zh-CN', {
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-  })
-}
-
-// ---------- 新增 / 编辑 ----------
-const dialogVisible = ref(false)
-const saving = ref(false)
-const editingId = ref<number | null>(null)
-const form = reactive({
-  courseId: undefined as number | undefined,
-  stage: 'BASIC' as string,
-  range: [] as string[],
-  status: 'OPEN' as string,
+  return grid
 })
 
-function openCreate() {
-  editingId.value = null
-  Object.assign(form, { courseId: undefined, stage: 'BASIC', range: [], status: 'OPEN' })
-  dialogVisible.value = true
-}
+// ---------- 点击方格确认上课 ----------
+async function handleCellClick(cell: CalendarCell) {
+  if (!cell.schedule) return
 
-function openEdit(row: ScheduleRow) {
-  editingId.value = row.id
-  Object.assign(form, {
-    courseId: row.courseId,
-    stage: row.stage,
-    range: [row.startTime, row.endTime],
-    status: row.status,
-  })
-  dialogVisible.value = true
-}
-
-async function handleSave() {
-  if (!form.courseId || form.range.length !== 2) {
-    ElMessage.warning('请选择课程与课程时段')
+  const schedule = cell.schedule
+  if (schedule.status === 'COMPLETED') {
+    ElMessage.info('该课程已标记为已上课')
     return
   }
-  saving.value = true
-  try {
-    const body = {
-      courseId: form.courseId,
-      stage: form.stage,
-      startTime: form.range[0],
-      endTime: form.range[1],
-      ...(editingId.value ? { status: form.status } : {}),
-    }
-    if (editingId.value) {
-      await request(`/api/schedules/${editingId.value}`, { method: 'PUT', body })
-      ElMessage.success('编辑成功')
-    }
-    else {
-      await request('/api/schedules', { method: 'POST', body })
-      ElMessage.success('新增成功')
-    }
-    dialogVisible.value = false
-    fetchList()
-  }
-  catch { /* 已统一提示 */ }
-  finally {
-    saving.value = false
-  }
-}
 
-async function handleDelete(row: ScheduleRow) {
   try {
-    await ElMessageBox.confirm('确认删除该排期？', '提示', { type: 'warning' })
+    await ElMessageBox.confirm(
+      `确认课程 "${schedule.course.name}"（会员：${schedule.member.name}）已上课？`,
+      '确认上课',
+      {
+        confirmButtonText: '确认已上课',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
   }
   catch {
     return // 用户取消
   }
+
   try {
-    await request(`/api/schedules/${row.id}`, { method: 'DELETE' })
-    ElMessage.success('删除成功')
-    fetchList()
+    await request(`/api/schedules/${schedule.id}`, {
+      method: 'PUT',
+      body: { status: 'COMPLETED' },
+    })
+    ElMessage.success('已标记为已上课')
+    fetchSchedules()
   }
   catch { /* 已统一提示 */ }
 }
 
+// ---------- 时间格式化 ----------
+function formatTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+// 获取课程状态颜色
+function getStatusColor(schedule: ScheduleItem | null): string {
+  if (!schedule) return 'transparent'
+  return schedule.status === 'COMPLETED' ? 'rgba(103, 194, 58, 0.3)' : 'rgba(64, 158, 255, 0.3)'
+}
+
+// ---------- 初始化 ----------
 onMounted(() => {
-  fetchList()
-  fetchOptions()
+  fetchCurrentUser().then(() => {
+    fetchSchedules().then(() => {
+      nextTick(() => {
+        scrollToEightAM()
+      })
+    })
+  })
 })
+
+// 滚动到 8:00
+function scrollToEightAM() {
+  if (calendarWrapper.value) {
+    // 8:00 对应第 8 行（0-indexed），每行高度约 60px
+    const scrollTop = 8 * 60
+    calendarWrapper.value.scrollTop = scrollTop
+  }
+}
 </script>
 
 <template>
-  <el-card shadow="never">
-    <!-- 筛选栏 -->
-    <div class="toolbar">
-      <el-select v-model="filters.courseId" placeholder="课程" clearable filterable class="w-180">
-        <el-option v-for="c in courses" :key="c.id" :label="c.name" :value="c.id" />
-      </el-select>
-      <el-select v-model="filters.stage" placeholder="课程阶段" clearable class="w-140">
-        <el-option v-for="(label, key) in StageLabels" :key="key" :label="label" :value="key" />
-      </el-select>
-      <el-select v-model="filters.status" placeholder="状态" clearable class="w-140">
-        <el-option v-for="(label, key) in ScheduleStatusLabels" :key="key" :label="label" :value="key" />
-      </el-select>
-      <el-button type="primary" @click="handleSearch">查询</el-button>
-      <div class="spacer" />
-      <el-button type="primary" @click="openCreate">新增排期</el-button>
+  <div class="calendar-container">
+    <!-- 头部工具栏 -->
+    <div class="calendar-header">
+      <div class="nav-buttons">
+        <el-button @click="prevWeek">
+          <el-icon>上周</el-icon>
+        </el-button>
+        <el-button type="primary" @click="goToToday">今天</el-button>
+        <el-button @click="nextWeek">
+          <el-icon>下周</el-icon>
+        </el-button>
+      </div>
+
+      <div class="month-selector">
+        <el-select v-model="selectedYear" class="year-select" @change="switchToMonth">
+          <el-option v-for="year in yearOptions" :key="year" :label="`${year}年`" :value="year" />
+        </el-select>
+        <el-select v-model="selectedMonth" class="month-select" @change="switchToMonth">
+          <el-option v-for="month in monthOptions" :key="month" :label="`${month}月`" :value="month" />
+        </el-select>
+      </div>
+
+      <div class="current-info">
+        <span v-if="currentUser" class="teacher-name">教练：{{ currentUser.name }}</span>
+        <span class="date-range">{{ weekRange.start }} ~ {{ weekRange.end }}</span>
+      </div>
     </div>
 
-    <!-- 列表 -->
-    <el-table v-loading="loading" :data="items" border stripe>
-      <el-table-column prop="id" label="ID" width="60" />
-      <el-table-column label="课程" min-width="140">
-        <template #default="{ row }">{{ row.course?.name }}</template>
-      </el-table-column>
-      <el-table-column label="员工" width="100">
-        <template #default="{ row }">{{ row.course?.staff?.name }}</template>
-      </el-table-column>
-      <el-table-column label="课程阶段" width="90">
-        <template #default="{ row }">
-          <el-tag>{{ StageLabels[asRow(row).stage] }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="课程时段" min-width="260">
-        <template #default="{ row }">{{ fmtTime(row.startTime) }} ~ {{ fmtTime(row.endTime) }}</template>
-      </el-table-column>
-      <el-table-column label="已约人数" width="100">
-        <template #default="{ row }">{{ row._count?.bookings ?? 0 }}</template>
-      </el-table-column>
-      <el-table-column label="状态" width="100">
-        <template #default="{ row }">
-          <el-tag :type="row.status === 'OPEN' ? 'success' : row.status === 'FINISHED' ? 'info' : 'danger'">
-            {{ ScheduleStatusLabels[asRow(row).status] }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="140" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="openEdit(asRow(row))">编辑</el-button>
-          <el-button link type="danger" @click="handleDelete(asRow(row))">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <!-- 日历表格 -->
+    <div v-loading="loading" ref="calendarWrapper" class="calendar-table-wrapper">
+      <table class="calendar-table">
+        <thead class="calendar-thead">
+          <tr>
+            <th class="time-header">时间</th>
+            <th v-for="(date, index) in weekDates" :key="index" class="day-header">
+              <div class="day-name">{{ weekDayNames[index] }}</div>
+              <div class="day-date" :class="{ 'is-today': formatDate(date) === formatDate(new Date()) }">
+                {{ date.getDate() }}
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(row, rowIndex) in calendarGrid" :key="rowIndex">
+            <td class="time-cell">
+              {{ String(rowIndex).padStart(2, '0') }}:00
+            </td>
+            <td
+              v-for="(cell, colIndex) in row"
+              :key="colIndex"
+              class="calendar-cell"
+              :class="{
+                'has-schedule': cell.schedule,
+                'is-completed': cell.schedule?.status === 'COMPLETED',
+                'is-clickable': cell.schedule && cell.schedule.status !== 'COMPLETED',
+              }"
+              :style="{ backgroundColor: getStatusColor(cell.schedule) }"
+              @click="handleCellClick(cell)"
+            >
+              <div v-if="cell.schedule" class="schedule-info">
+                <div class="course-name">{{ cell.schedule.course.name }}</div>
+                <div class="member-name">{{ cell.schedule.member.name }}</div>
+                <div class="time-range">
+                  {{ formatTime(cell.schedule.startTime) }} - {{ formatTime(cell.schedule.endTime) }}
+                </div>
+                <div v-if="cell.schedule.status === 'COMPLETED'" class="status-badge completed">
+                  已上课
+                </div>
+                <div v-else class="status-badge pending">
+                  未上课
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-    <!-- 分页 -->
-    <el-pagination
-      v-model:current-page="page"
-      v-model:page-size="pageSize"
-      :total="total"
-      :page-sizes="[10, 20, 50]"
-      layout="total, sizes, prev, pager, next"
-      class="pagination"
-      @change="fetchList"
-    />
-
-    <!-- 新增/编辑对话框 -->
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑排期' : '新增排期'" width="520px">
-      <el-form label-width="90px">
-        <el-form-item label="课程" required>
-          <el-select v-model="form.courseId" filterable placeholder="请选择课程" :disabled="!!editingId">
-            <el-option v-for="c in courses" :key="c.id" :label="c.name" :value="c.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="课程阶段">
-          <el-radio-group v-model="form.stage">
-            <el-radio-button v-for="(label, key) in StageLabels" :key="key" :value="key">{{ label }}</el-radio-button>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="课程时段" required>
-          <el-date-picker
-            v-model="form.range"
-            type="datetimerange"
-            value-format="YYYY-MM-DDTHH:mm:ss"
-            start-placeholder="开始时间"
-            end-placeholder="结束时间"
-          />
-        </el-form-item>
-        <el-form-item v-if="editingId" label="状态">
-          <el-select v-model="form.status">
-            <el-option v-for="(label, key) in ScheduleStatusLabels" :key="key" :label="label" :value="key" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="handleSave">保存</el-button>
-      </template>
-    </el-dialog>
-  </el-card>
+    <!-- 图例 -->
+    <div class="legend">
+      <div class="legend-item">
+        <span class="legend-color" style="background-color: rgba(64, 158, 255, 0.3);"></span>
+        <span>未上课（点击确认）</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-color" style="background-color: rgba(103, 194, 58, 0.3);"></span>
+        <span>已上课</span>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
-.toolbar {
+.calendar-container {
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.nav-buttons {
   display: flex;
   gap: 8px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
 }
 
-.spacer {
-  flex: 1;
+.month-selector {
+  display: flex;
+  gap: 8px;
 }
 
-.w-180 { width: 180px; }
-.w-140 { width: 140px; }
+.year-select {
+  width: 100px;
+}
 
-.pagination {
+.month-select {
+  width: 80px;
+}
+
+.current-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.teacher-name {
+  font-weight: 600;
+  color: #409eff;
+  font-size: 14px;
+}
+
+.date-range {
+  font-size: 14px;
+  color: #606266;
+}
+
+.calendar-table-wrapper {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 600px;
+  position: relative;
+}
+
+.calendar-thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: #f5f7fa;
+}
+
+.calendar-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.calendar-table th,
+.calendar-table td {
+  border: 1px solid #ebeef5;
+  padding: 0;
+}
+
+.time-header {
+  width: 70px;
+  background-color: #f5f7fa;
+  font-weight: 600;
+  text-align: center;
+  padding: 10px 0;
+}
+
+.day-header {
+  background-color: #f5f7fa;
+  text-align: center;
+  padding: 10px 0;
+  min-width: 120px;
+}
+
+.day-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.day-date {
+  font-size: 18px;
+  font-weight: 700;
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  margin: 0 auto;
+  border-radius: 50%;
+}
+
+.day-date.is-today {
+  background-color: #409eff;
+  color: #fff;
+}
+
+.time-cell {
+  background-color: #f5f7fa;
+  text-align: center;
+  font-size: 12px;
+  color: #909399;
+  padding: 8px 4px;
+  vertical-align: top;
+}
+
+.calendar-cell {
+  height: 60px;
+  vertical-align: top;
+  padding: 4px;
+  transition: background-color 0.2s;
+  cursor: default;
+}
+
+.calendar-cell.has-schedule {
+  cursor: pointer;
+}
+
+.calendar-cell.has-schedule:hover {
+  opacity: 0.8;
+}
+
+.calendar-cell.is-completed {
+  cursor: not-allowed;
+}
+
+.schedule-info {
+  font-size: 12px;
+  line-height: 1.4;
+  padding: 4px;
+  border-radius: 4px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.course-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.member-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #606266;
+}
+
+.time-range {
+  color: #909399;
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.status-badge {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-top: 4px;
+}
+
+.status-badge.completed {
+  background-color: #67c23a;
+  color: #fff;
+}
+
+.status-badge.pending {
+  background-color: #409eff;
+  color: #fff;
+}
+
+.legend {
+  display: flex;
+  gap: 24px;
   margin-top: 16px;
   justify-content: flex-end;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #606266;
+}
+
+.legend-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
 }
 </style>

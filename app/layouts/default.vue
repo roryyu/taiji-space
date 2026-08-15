@@ -28,8 +28,9 @@ const allMenus = [
   { path: '/members', title: '会员信息', icon: User, roles: ['MANAGER', 'ADMINISTRATOR'] },
   { path: '/cards', title: '会员卡', icon: CreditCard, roles: ['MANAGER', 'ADMINISTRATOR'] },
   { path: '/courses', title: '课程管理', icon: Reading, roles: ['MANAGER', 'ADMINISTRATOR'] },
-  { path: '/schedules', title: '课程排期', icon: Calendar, roles: ['TEACHER', 'MANAGER', 'ADMINISTRATOR'] },
   { path: '/bookings', title: '课程预约', icon: Tickets, roles: ['TEACHER', 'MANAGER', 'ADMINISTRATOR'] },
+  { path: '/schedules', title: '课程排期', icon: Calendar, roles: ['TEACHER'] },
+
   { path: '/reviews', title: '课程评价', icon: ChatDotSquare, roles: ['MANAGER', 'ADMINISTRATOR'] },
   { path: '/staffs', title: '员工管理', icon: Avatar, roles: ['ADMINISTRATOR'] },
   { path: '/analytics', title: '运营分析', icon: TrendCharts, roles: ['MANAGER', 'ADMINISTRATOR'] },

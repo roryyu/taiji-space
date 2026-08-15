@@ -4,18 +4,18 @@ import type { Prisma } from '~~/generated/prisma/client'
 
 const schema = z.object({
   courseId: z.coerce.number().int().positive().optional(),
-  stage: z.enum(['BASIC', 'INTERMEDIATE', 'ADVANCED']).optional(),
-  status: z.enum(['OPEN', 'FINISHED', 'CANCELLED']).optional(),
+  cardId: z.coerce.number().int().positive().optional(),
+  memberId: z.coerce.number().int().positive().optional(),
 })
 
 export default defineEventHandler(async (event) => {
-  const { courseId, stage, status } = parseQuery(event, schema)
+  const { courseId, cardId, memberId } = parseQuery(event, schema)
   const { page, pageSize, skip, take } = parsePagination(event)
 
   const where: Prisma.CourseScheduleWhereInput = {
     ...(courseId ? { courseId } : {}),
-    ...(stage ? { stage } : {}),
-    ...(status ? { status } : {}),
+    ...(cardId ? { cardId } : {}),
+    ...(memberId ? { memberId } : {}),
   }
 
   const [total, items] = await Promise.all([
@@ -29,8 +29,12 @@ export default defineEventHandler(async (event) => {
         course: {
           select: { id: true, name: true },
         },
-        // 仅统计有效预约数，用于展示「已约/容量」
-        _count: { select: { bookings: { where: { status: { not: 'CANCELLED' } } } } },
+        card: {
+          select: { id: true, cardNo: true },
+        },
+        member: {
+          select: { id: true, name: true },
+        },
       },
     }),
   ])

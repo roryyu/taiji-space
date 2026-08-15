@@ -2,7 +2,6 @@
 <script setup lang="ts">
 /** 会员分析响应 */
 interface MemberAnalytics {
-  frequency: { memberId: number; name: string; completedCount: number }[]
   tags: { tag: string; count: number }[]
 }
 
@@ -24,7 +23,6 @@ interface CourseAnalytics {
     courseId: number
     name: string
     scheduleCount: number
-    bookingCount: number
   }[]
 }
 
@@ -71,24 +69,14 @@ const maxTagCount = computed(() =>
     <el-tabs v-model="activeTab">
       <!-- 会员分析 -->
       <el-tab-pane label="会员分析" name="members">
-        <div class="analytics-grid">
-          <div>
-            <h3>上课频次 Top10（已完成预约）</h3>
-            <el-table :data="memberData?.frequency ?? []" border size="small">
-              <el-table-column type="index" label="#" width="50" />
-              <el-table-column prop="name" label="会员" min-width="100" />
-              <el-table-column prop="completedCount" label="上课次数" width="90" />
-            </el-table>
+        <div>
+          <h3>课程偏好标签分布</h3>
+          <div v-for="t in memberData?.tags ?? []" :key="t.tag" class="tag-row">
+            <span class="tag-name">{{ t.tag }}</span>
+            <el-progress :percentage="Math.round((t.count / maxTagCount) * 100)" :show-text="false" class="tag-bar" />
+            <span class="tag-count">{{ t.count }}</span>
           </div>
-          <div>
-            <h3>课程偏好标签分布</h3>
-            <div v-for="t in memberData?.tags ?? []" :key="t.tag" class="tag-row">
-              <span class="tag-name">{{ t.tag }}</span>
-              <el-progress :percentage="Math.round((t.count / maxTagCount) * 100)" :show-text="false" class="tag-bar" />
-              <span class="tag-count">{{ t.count }}</span>
-            </div>
-            <el-empty v-if="!memberData?.tags?.length" description="暂无标签数据" :image-size="60" />
-          </div>
+          <el-empty v-if="!memberData?.tags?.length" description="暂无标签数据" :image-size="60" />
         </div>
       </el-tab-pane>
 
@@ -118,15 +106,6 @@ const maxTagCount = computed(() =>
         <el-table :data="courseData?.items ?? []" border>
           <el-table-column prop="name" label="课程" min-width="140" />
           <el-table-column prop="scheduleCount" label="排期场次" width="90" />
-          <el-table-column prop="bookingCount" label="报名人数" width="90" />
-          <el-table-column label="报名热度" min-width="180">
-            <template #default="{ row }">
-              <el-progress
-                :percentage="Math.min(100, Math.round((row.bookingCount / Math.max(1, row.scheduleCount)) * 100))"
-                :stroke-width="14"
-              />
-            </template>
-          </el-table-column>
         </el-table>
       </el-tab-pane>
     </el-tabs>

@@ -16,13 +16,9 @@ export const TxTypeLabels = {
   EXTEND: '延期',
 } as const
 
-export const StageLabels = { BASIC: '基础', INTERMEDIATE: '进阶', ADVANCED: '高级' } as const
-
-export const ScheduleStatusLabels = { OPEN: '开放预约', FINISHED: '已结课', CANCELLED: '已取消' } as const
-
-export const BookingStatusLabels = { BOOKED: '已预约', CANCELLED: '已取消', COMPLETED: '已完成' } as const
-
 export const StaffTypeLabels = { TEACHER: '教练', MANAGER: '经理', ADMINISTRATOR: '管理员' } as const
+
+export const ScheduleStatusLabels = { PENDING: '未上课', COMPLETED: '已上课' } as const
 
 /** 由中文标签反查枚举值（批量导入时兼容中文输入） */
 export function labelToEnum<T extends Record<string, string>>(labels: T, text: string): keyof T | undefined {

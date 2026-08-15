@@ -97,12 +97,12 @@ npm run db:deploy     # 生产环境：仅应用已提交的迁移
 
 | 菜单 | 路由 | 说明 |
 | --- | --- | --- |
-| 工作台 | `/` | 核心指标总览（会员数/活跃卡/课程/今日排期/待上课预约） |
+| 工作台 | `/` | 核心指标总览（会员数/活跃卡/课程/今日排期） |
 | 会员信息 | `/members` | 增删改查 + CSV 批量导入（姓名/手机号/获客渠道/偏好标签/备注） |
 | 会员卡 | `/cards` | 开卡/编辑/有效期延长，关联门店/课程/员工，全部操作落流水 |
 | 课程管理 | `/courses` | 课程 CRUD（名称/描述） |
-| 课程排期 | `/schedules` | 排期 CRUD（阶段/时段） |
-| 课程预约 | `/bookings` | 预约/取消/完成核销，重复预约校验 |
+| 课程排期 | `/schedules` | 排期 CRUD（会员卡/会员/课程/时段/状态） |
+| 课程预约 | `/bookings` | 基于会员卡的排期设置，支持批量设置/修改/删除未上课排期 |
 | 课程评价 | `/reviews` | 评价录入/删除（会员/课程/1-5 星/建议） |
 | 员工管理 | `/staffs` | 员工 CRUD（姓名/资质/风格标签/账号/密码/类型：教练/经理/管理员） |
 | 运营分析 | `/analytics` | 会员标签分布、员工统计、课程报名统计 |
@@ -125,7 +125,7 @@ taiji-space/
 │   └── utils/prisma.ts         # Prisma Client 全局单例（防 HMR 连接泄漏）
 ├── shared/                     # 前后端共享类型与枚举中文映射
 ├── prisma/
-│   ├── schema.prisma           # 数据模型（10 张表）
+│   ├── schema.prisma           # 数据模型（9 张表）
 │   ├── seed.ts                 # 种子数据（管理员账号 + 演示数据）
 │   └── migrations/             # 数据库迁移文件
 ├── prisma.config.ts            # Prisma 7 CLI 配置（datasource.url + seed 命令）
@@ -165,11 +165,13 @@ taiji-space/
 
 #### 角色权限矩阵
 
-| 角色 | 可见菜单 |
-| --- | --- |
-| TEACHER（教练） | 课程排期、课程预约 |
-| MANAGER（经理） | 工作台、会员信息、会员卡、课程管理、课程排期、课程预约、课程评价、运营分析 |
-| ADMINISTRATOR（管理员） | 所有菜单 |
+| 角色 | 可见菜单 | 数据权限 |
+| --- | --- | --- |
+| TEACHER（教练） | 课程排期、课程预约 | 课程预约只显示关联教师是自己的会员卡 |
+| MANAGER（经理） | 工作台、会员信息、会员卡、课程管理、课程预约、课程评价、运营分析 | 课程预约只显示自己创建的会员卡 |
+| ADMINISTRATOR（管理员） | 工作台、会员信息、会员卡、课程管理、课程预约、课程评价、员工管理、运营分析、系统配置 | 课程预约显示所有会员卡 |
+
+> 注：课程排期仅 TEACHER 可见；课程预约三个角色均可见，但数据范围不同。
 
 #### 实现方案
 
@@ -232,6 +234,121 @@ taiji-space/
 ```bash
 npx prisma migrate dev --name add_membershipcard_staffid
 ```
+
+### 课程排期调整（2026-08-15）
+
+#### 数据模型变更
+
+| 变更项 | 说明 |
+| --- | --- |
+| 删除 `Booking` 表 | 预约功能改为直接通过 CourseSchedule 实现 |
+| 删除 `CourseStage` 枚举 | 课程阶段字段移除 |
+| 删除 `BookingStatus` 枚举 | Booking 表删除，枚举不再需要 |
+| 新增 `ScheduleStatus` 枚举 | 值：PENDING（未上课）、COMPLETED（已上课） |
+| `CourseSchedule` 表 | 删除 `stage`（CourseStage）和 `status`（ScheduleStatus）字段 |
+| `CourseSchedule` 表 | 新增 `cardId`（关联 MembershipCard）、`memberId`（关联 Member）、`status`（ScheduleStatus，默认 PENDING）字段 |
+| `Member` 表 | 新增 `schedules` 反向关系 |
+| `MembershipCard` 表 | 新增 `schedules` 反向关系 |
+
+#### 业务逻辑变更
+
+- **课程预约**：基于会员卡实现，预约情况 = 已设置预约数 / 总可预约数（会员卡次数 + 赠送次数）
+- **排期状态**：未上课的排期可编辑/删除，已上课的排期不可修改
+- **数据过滤**：
+  - MANAGER：只能查看自己创建的会员卡
+  - ADMINISTRATOR：可查看所有会员卡
+  - TEACHER：只能查看关联教师是自己的会员卡
+
+#### API 变更
+
+| 接口 | 变更说明 |
+| --- | --- |
+| `GET /api/cards` | 新增 TEACHER 角色过滤（coachId = auth.id）；返回预约情况（bookingInfo、scheduledCount、totalBookable） |
+| `POST /api/schedules/batch` | 新增批量更新排期接口，支持根据 id 更新未上课的排期，已上课的不能修改 |
+| `GET /api/schedules` | 查询参数改为 courseId/cardId/memberId，返回 status 字段 |
+| `PUT /api/schedules/:id` | 已上课的排期不能修改 |
+| `DELETE /api/schedules/:id` | 已上课的排期不能删除 |
+| 删除 `/api/bookings/*` | Booking 表删除，相关接口移除 |
+
+#### 前端变更
+
+| 变更项 | 说明 |
+| --- | --- |
+| 课程预约页面 | 基于会员卡展示预约情况；点击"预约"弹出排期设置弹窗；已上课的排期显示为禁用状态 |
+| 课程排期页面 | 显示会员卡、会员、课程、状态、时段；已上课的排期编辑/删除按钮禁用 |
+| 工作台 | 移除"今日预约"指标 |
+| 运营分析 | 移除会员上课频次 Top10 和课程报名人数统计 |
+
+#### 数据库迁移
+
+```bash
+npx prisma migrate dev --name remove_schedule_stage_status
+npx prisma migrate dev --name add_schedule_status
+```
+
+### 课程排期日历视图（2026-08-15）
+
+#### 功能说明
+
+课程排期页面从表格视图改为日历视图，提供更直观的排期查看和管理体验。
+
+#### 新增 API
+
+| 接口 | 说明 |
+| --- | --- |
+| `GET /api/schedules/calendar` | 日历视图数据查询，支持按日期范围（startDate/endDate）和 staffId 筛选 |
+
+#### 前端变更
+
+| 变更项 | 说明 |
+| --- | --- |
+| 课程排期页面 | 改为日历视图：一周七天 × 24 小时网格布局 |
+| 周切换 | 左右箭头按钮切换上/下一周，"今天"按钮快速回到当前日期 |
+| 年月切换 | 年份和月份下拉选择器，快速跳转到指定月份 |
+| 当前教练显示 | 自动获取登录用户信息，显示当前教练姓名 |
+| 半透明方格 | 未上课：蓝色半透明；已上课：绿色半透明 |
+| 点击确认上课 | 点击未上课的方格，弹出二次确认框，确认后更新 CourseSchedule 表的 status 为 COMPLETED |
+| 表头固定 | 日历表头固定在顶部，内容区域可滚动 |
+| 默认滚动 | 页面加载后自动滚动到 8:00 位置 |
+
+#### API 变更
+
+| 接口 | 变更说明 |
+| --- | --- |
+| `PUT /api/schedules/:id` | 新增支持 status 字段更新（PENDING/COMPLETED） |
+
+### 课程预约耗课情况（2026-08-15）
+
+#### 功能说明
+
+课程预约页面的"耗课情况"列改为显示已上课数/总课数，更直观地展示课程消耗进度。
+
+#### API 变更
+
+| 接口 | 变更说明 |
+| --- | --- |
+| `GET /api/cards` | 新增返回字段：completedCount（已上课数）、totalCourseCount（总课数）、courseUsageInfo（耗课信息字符串） |
+
+#### 前端变更
+
+| 变更项 | 说明 |
+| --- | --- |
+| 耗课情况列 | 显示格式改为 {已上课数}/{总课数}，总课数 = 会员卡次数 + 赠送次数 |
+| 状态标签 | 已完成全部课程显示绿色标签，否则显示橙色标签 |
+
+### 课程预约时间选择优化（2026-08-15）
+
+#### 功能说明
+
+简化课程预约排期的时间选择交互，改为三步选择：日期 → 开始时分 → 结束时分。
+
+#### 前端变更
+
+| 变更项 | 说明 |
+| --- | --- |
+| 时间选择器 | 从两个 datetime-picker 改为：日期选择器 + 开始时分选择器 + 结束时分选择器 |
+| 数据结构 | ScheduleItem 接口拆分为 date（YYYY-MM-DD）+ startTime（HH:mm）+ endTime（HH:mm） |
+| 数据保存 | 自动将日期和时分组合为完整的 ISO 时间字符串 |
 
 ### 店铺店长功能（2026-08-14）
 
