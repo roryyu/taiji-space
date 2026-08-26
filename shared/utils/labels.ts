@@ -2,6 +2,8 @@
 
 export const MemberCategoryLabels = { NORMAL: '普通会员', VIP: 'VIP', SVIP: 'SVIP' } as const
 
+export const GenderLabels = { MALE: '男', FEMALE: '女', OTHER: '其他' } as const
+
 export const ChannelLabels = {
   WALK_IN: '到店咨询',
   REFERRAL: '转介绍',

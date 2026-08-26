@@ -37,6 +37,13 @@ enum StaffType {
   ADMINISTRATOR // 管理员
 }
 
+/// 性别
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
 /// 排期状态
 enum ScheduleStatus {
   PENDING // 未上课
@@ -84,6 +91,14 @@ model Member {
   name           String // 顾客姓名
   phone          String             @unique // 手机号
   channel        AcquisitionChannel @default(WALK_IN) // 获客渠道
+  gender         Gender? // 性别
+  birthday       DateTime? // 生日
+  physicalDisease String? // 生理疾病
+  mentalDisease   String? // 心理疾病
+  isSportsInjuryRecovery Boolean @default(false) // 是否运动伤害康复
+  isHypertension  Boolean @default(false) // 是否高血压
+  isHyperlipidemia Boolean @default(false) // 是否高血脂
+  isHyperglycemia Boolean @default(false) // 是否高血糖
   preferenceTags String[] // 标签-课程偏好
   remark         String? // 标签-备注
   createdAt      DateTime           @default(now())

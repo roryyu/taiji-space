@@ -8,6 +8,14 @@ interface MemberRow {
   name: string
   phone: string
   channel: keyof typeof ChannelLabels
+  gender: keyof typeof GenderLabels | null
+  birthday: string | null
+  physicalDisease: string | null
+  mentalDisease: string | null
+  isSportsInjuryRecovery: boolean
+  isHypertension: boolean
+  isHyperlipidemia: boolean
+  isHyperglycemia: boolean
   preferenceTags: string[]
   remark: string | null
 }
@@ -59,6 +67,14 @@ const form = reactive({
   name: '',
   phone: '',
   channel: 'WALK_IN' as string,
+  gender: null as string | null,
+  birthday: null as string | null,
+  physicalDisease: '',
+  mentalDisease: '',
+  isSportsInjuryRecovery: false,
+  isHypertension: false,
+  isHyperlipidemia: false,
+  isHyperglycemia: false,
   preferenceTags: [] as string[],
   remark: '',
 })
@@ -67,7 +83,11 @@ function openCreate() {
   editingId.value = null
   Object.assign(form, {
     name: '', phone: '',
-    channel: 'WALK_IN', preferenceTags: [], remark: '',
+    channel: 'WALK_IN', gender: null, birthday: null,
+    physicalDisease: '', mentalDisease: '',
+    isSportsInjuryRecovery: false, isHypertension: false,
+    isHyperlipidemia: false, isHyperglycemia: false,
+    preferenceTags: [], remark: '',
   })
   dialogVisible.value = true
 }
@@ -78,6 +98,14 @@ function openEdit(row: MemberRow) {
     name: row.name,
     phone: row.phone,
     channel: row.channel,
+    gender: row.gender ?? null,
+    birthday: row.birthday ?? null,
+    physicalDisease: row.physicalDisease ?? '',
+    mentalDisease: row.mentalDisease ?? '',
+    isSportsInjuryRecovery: row.isSportsInjuryRecovery,
+    isHypertension: row.isHypertension,
+    isHyperlipidemia: row.isHyperlipidemia,
+    isHyperglycemia: row.isHyperglycemia,
     preferenceTags: [...row.preferenceTags],
     remark: row.remark ?? '',
   })
@@ -92,7 +120,14 @@ async function handleSave() {
   }
   saving.value = true
   try {
-    const body = { ...form, remark: form.remark || null }
+    const body = {
+      ...form,
+      gender: form.gender || null,
+      birthday: form.birthday || null,
+      physicalDisease: form.physicalDisease || null,
+      mentalDisease: form.mentalDisease || null,
+      remark: form.remark || null,
+    }
     if (editingId.value) {
       await request(`/api/members/${editingId.value}`, { method: 'PUT', body })
       ElMessage.success('编辑成功')
@@ -194,6 +229,27 @@ onMounted(() => {
       <el-table-column label="获客渠道" width="100">
         <template #default="{ row }">{{ ChannelLabels[asRow(row).channel] }}</template>
       </el-table-column>
+      <el-table-column label="性别" width="70">
+        <template #default="{ row }">{{ asRow(row).gender ? GenderLabels[asRow(row).gender!] : '-' }}</template>
+      </el-table-column>
+      <el-table-column label="生日" width="110">
+        <template #default="{ row }">{{ asRow(row).birthday ? asRow(row).birthday!.slice(0, 10) : '-' }}</template>
+      </el-table-column>
+      <el-table-column label="健康标签" min-width="200">
+        <template #default="{ row }">
+          <template v-if="asRow(row).physicalDisease">
+            <el-tag type="danger" size="small" class="tag-item">{{ asRow(row).physicalDisease }}</el-tag>
+          </template>
+          <template v-if="asRow(row).mentalDisease">
+            <el-tag type="warning" size="small" class="tag-item">{{ asRow(row).mentalDisease }}</el-tag>
+          </template>
+          <el-tag v-if="asRow(row).isSportsInjuryRecovery" type="info" size="small" class="tag-item">运动康复</el-tag>
+          <el-tag v-if="asRow(row).isHypertension" type="danger" size="small" class="tag-item">高血压</el-tag>
+          <el-tag v-if="asRow(row).isHyperlipidemia" type="danger" size="small" class="tag-item">高血脂</el-tag>
+          <el-tag v-if="asRow(row).isHyperglycemia" type="danger" size="small" class="tag-item">高血糖</el-tag>
+          <span v-if="!asRow(row).physicalDisease && !asRow(row).mentalDisease && !asRow(row).isSportsInjuryRecovery && !asRow(row).isHypertension && !asRow(row).isHyperlipidemia && !asRow(row).isHyperglycemia">-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="课程偏好" min-width="150">
         <template #default="{ row }">
           <el-tag v-for="tag in row.preferenceTags" :key="tag" size="small" class="tag-item">{{ tag }}</el-tag>
@@ -223,19 +279,81 @@ onMounted(() => {
     />
 
     <!-- 新增/编辑对话框 -->
-    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑会员' : '新增会员'" width="520px">
-      <el-form label-width="90px">
-        <el-form-item label="顾客姓名" required>
-          <el-input v-model="form.name" maxlength="50" />
-        </el-form-item>
-        <el-form-item label="手机号" required>
-          <el-input v-model="form.phone" maxlength="11" />
-        </el-form-item>
-        <el-form-item label="获客渠道">
-          <el-select v-model="form.channel">
-            <el-option v-for="(label, key) in ChannelLabels" :key="key" :label="label" :value="key" />
-          </el-select>
-        </el-form-item>
+    <el-dialog v-model="dialogVisible" :title="editingId ? '编辑会员' : '新增会员'" width="680px">
+      <el-form label-width="100px">
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="顾客姓名" required>
+              <el-input v-model="form.name" maxlength="50" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="手机号" required>
+              <el-input v-model="form.phone" maxlength="11" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="获客渠道">
+              <el-select v-model="form.channel">
+                <el-option v-for="(label, key) in ChannelLabels" :key="key" :label="label" :value="key" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="性别">
+              <el-select v-model="form.gender" clearable placeholder="请选择">
+                <el-option v-for="(label, key) in GenderLabels" :key="key" :label="label" :value="key" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="生日">
+              <el-date-picker v-model="form.birthday" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-divider content-position="left">健康信息</el-divider>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="生理疾病">
+              <el-input v-model="form.physicalDisease" maxlength="200" placeholder="如：腰椎间盘突出" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="心理疾病">
+              <el-input v-model="form.mentalDisease" maxlength="200" placeholder="如：焦虑症" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="运动伤害康复">
+              <el-switch v-model="form.isSportsInjuryRecovery" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="高血压">
+              <el-switch v-model="form.isHypertension" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="高血脂">
+              <el-switch v-model="form.isHyperlipidemia" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="高血糖">
+              <el-switch v-model="form.isHyperglycemia" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-divider content-position="left">其他信息</el-divider>
         <el-form-item label="课程偏好">
           <el-select v-model="form.preferenceTags" multiple filterable allow-create default-first-option placeholder="输入后回车创建标签" />
         </el-form-item>
