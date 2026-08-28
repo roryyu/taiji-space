@@ -16,6 +16,7 @@ interface MemberRow {
   isHypertension: boolean
   isHyperlipidemia: boolean
   isHyperglycemia: boolean
+  firstCardDate: string | null
   preferenceTags: string[]
   remark: string | null
 }
@@ -75,6 +76,7 @@ const form = reactive({
   isHypertension: false,
   isHyperlipidemia: false,
   isHyperglycemia: false,
+  firstCardDate: null as string | null,
   preferenceTags: [] as string[],
   remark: '',
 })
@@ -87,6 +89,7 @@ function openCreate() {
     physicalDisease: '', mentalDisease: '',
     isSportsInjuryRecovery: false, isHypertension: false,
     isHyperlipidemia: false, isHyperglycemia: false,
+    firstCardDate: null,
     preferenceTags: [], remark: '',
   })
   dialogVisible.value = true
@@ -106,6 +109,7 @@ function openEdit(row: MemberRow) {
     isHypertension: row.isHypertension,
     isHyperlipidemia: row.isHyperlipidemia,
     isHyperglycemia: row.isHyperglycemia,
+    firstCardDate: row.firstCardDate ?? null,
     preferenceTags: [...row.preferenceTags],
     remark: row.remark ?? '',
   })
@@ -126,6 +130,7 @@ async function handleSave() {
       birthday: form.birthday || null,
       physicalDisease: form.physicalDisease || null,
       mentalDisease: form.mentalDisease || null,
+      firstCardDate: form.firstCardDate || null,
       remark: form.remark || null,
     }
     if (editingId.value) {
@@ -250,6 +255,9 @@ onMounted(() => {
           <span v-if="!asRow(row).physicalDisease && !asRow(row).mentalDisease && !asRow(row).isSportsInjuryRecovery && !asRow(row).isHypertension && !asRow(row).isHyperlipidemia && !asRow(row).isHyperglycemia">-</span>
         </template>
       </el-table-column>
+      <el-table-column label="首次开卡" width="110">
+        <template #default="{ row }">{{ asRow(row).firstCardDate ? asRow(row).firstCardDate!.slice(0, 10) : '-' }}</template>
+      </el-table-column>
       <el-table-column label="课程偏好" min-width="150">
         <template #default="{ row }">
           <el-tag v-for="tag in row.preferenceTags" :key="tag" size="small" class="tag-item">{{ tag }}</el-tag>
@@ -313,6 +321,11 @@ onMounted(() => {
           <el-col :span="12">
             <el-form-item label="生日">
               <el-date-picker v-model="form.birthday" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%;" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="首次开卡">
+              <el-date-picker v-model="form.firstCardDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width: 100%;" />
             </el-form-item>
           </el-col>
         </el-row>

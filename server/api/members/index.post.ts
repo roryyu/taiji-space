@@ -13,6 +13,7 @@ const schema = z.object({
   isHypertension: z.boolean().default(false),
   isHyperlipidemia: z.boolean().default(false),
   isHyperglycemia: z.boolean().default(false),
+  firstCardDate: z.string().datetime().nullable().optional(),
   preferenceTags: z.array(z.string().max(20)).max(10).default([]),
   remark: z.string().max(200).nullable().optional(),
 })

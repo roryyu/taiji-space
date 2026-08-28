@@ -99,6 +99,7 @@ model Member {
   isHypertension  Boolean @default(false) // 是否高血压
   isHyperlipidemia Boolean @default(false) // 是否高血脂
   isHyperglycemia Boolean @default(false) // 是否高血糖
+  firstCardDate   DateTime? // 首次开卡时间
   preferenceTags String[] // 标签-课程偏好
   remark         String? // 标签-备注
   createdAt      DateTime           @default(now())
