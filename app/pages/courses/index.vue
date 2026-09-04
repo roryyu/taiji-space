@@ -123,7 +123,7 @@ onMounted(fetchList)
     </div>
 
     <!-- 列表 -->
-    <el-table v-loading="loading" :data="items" border stripe>
+    <el-table v-loading="loading" :data="items">
       <el-table-column prop="id" label="ID" width="60" />
       <el-table-column prop="name" label="课程名称" min-width="140" />
       <el-table-column label="课程描述" min-width="180">

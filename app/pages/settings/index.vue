@@ -207,7 +207,7 @@ onMounted(() => {
           <div class="spacer" />
           <el-button type="primary" @click="openStoreCreate">新增店铺</el-button>
         </div>
-        <el-table v-loading="storeLoading" :data="stores" border stripe>
+        <el-table v-loading="storeLoading" :data="stores">
           <el-table-column prop="id" label="ID" width="60" />
           <el-table-column prop="name" label="店铺名称" min-width="140" />
           <el-table-column prop="address" label="地址" min-width="220" />
@@ -244,7 +244,7 @@ onMounted(() => {
           <div class="spacer" />
           <el-button type="primary" @click="openParamCreate">新增参数</el-button>
         </div>
-        <el-table v-loading="paramLoading" :data="params" border stripe>
+        <el-table v-loading="paramLoading" :data="params">
           <el-table-column prop="key" label="参数键" min-width="160" />
           <el-table-column prop="value" label="参数值" min-width="180" />
           <el-table-column label="说明" min-width="200">

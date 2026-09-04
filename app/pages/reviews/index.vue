@@ -163,7 +163,7 @@ onMounted(() => {
     </div>
 
     <!-- 列表 -->
-    <el-table v-loading="loading" :data="items" border stripe>
+    <el-table v-loading="loading" :data="items">
       <el-table-column prop="id" label="ID" width="60" />
       <el-table-column label="会员" width="120">
         <template #default="{ row }">{{ row.member?.name }}</template>

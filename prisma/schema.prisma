@@ -64,6 +64,7 @@ model Store {
 
   manager Staff?         @relation(fields: [staffId], references: [id])
   cards   MembershipCard[]
+  feedbacks MemberFeedback[]
 
   @@index([staffId])
 }
@@ -83,6 +84,7 @@ model Staff {
   cards   MembershipCard[] @relation("CoachCards")
   created MembershipCard[] @relation("CreatorCards")
   stores  Store[] // 作为店长管理的店铺
+  feedbacks MemberFeedback[]
 }
 
 /// 会员信息
@@ -108,6 +110,7 @@ model Member {
   cards     MembershipCard[]
   reviews   CourseReview[]
   schedules CourseSchedule[]
+  feedbacks MemberFeedback[]
 }
 
 /// 会员卡
@@ -167,6 +170,7 @@ model Course {
   schedules CourseSchedule[]
   reviews   CourseReview[]
   cards     MembershipCard[]
+  feedbacks MemberFeedback[]
 }
 
 /// 课程排期
@@ -217,4 +221,26 @@ model SystemParam {
   value       String
   description String?
   updatedAt   DateTime @updatedAt
+}
+
+/// 会员沟通反馈（运营红灯客户的跟进记录：预约上课/为什么不来上课/近况等）
+model MemberFeedback {
+  id        Int      @id @default(autoincrement())
+  memberId  Int
+  storeId   Int      @default(1) // 所属门店
+  courseId  Int      @default(1) // 关联课程
+  coachId   Int      @default(1) // 关联教练
+  content   String? // 沟通内容记录
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  member Member @relation(fields: [memberId], references: [id])
+  store  Store  @relation(fields: [storeId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+  coach  Staff  @relation(fields: [coachId], references: [id])
+
+  @@index([memberId])
+  @@index([storeId])
+  @@index([courseId])
+  @@index([coachId])
 }

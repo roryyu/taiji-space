@@ -379,6 +379,36 @@ npx prisma migrate dev --name add_schedule_status
 npx prisma migrate dev --name add_store_staffid
 ```
 
+### 会员沟通反馈（2026-09-04）
+
+#### 功能说明
+
+课程预约列表的运营标识为红灯（耗课未完成且近一个月 0 次上课）的会员卡，新增“沟通反馈”操作，用于记录与客户的沟通内容（预约上课？为什么不来上课？近况等），保存到 MemberFeedback 表。
+
+#### 数据模型变更
+
+- 新建 `MemberFeedback` 表：id / memberId（关联 Member）/ storeId / courseId / coachId（均默认 1）/ content（沟通内容，可选）/ createdAt / updatedAt
+- Member / Store / Course / Staff 表新增 `feedbacks` 反向关系（仅模型层，无库表变更）
+
+#### API 变更
+
+| 接口 | 说明 |
+| --- | --- |
+| `POST /api/feedbacks` | 记录沟通反馈（memberId/storeId/courseId/coachId/content） |
+| `GET /api/feedbacks` | 沟通反馈查询，支持 memberId 筛选，服务端分页，返回会员/门店/课程/教练信息 |
+
+#### 前端变更
+
+| 变更项 | 说明 |
+| --- | --- |
+| 课程预约页面 | 红灯行新增“沟通反馈”按钮；弹窗展示会员卡信息、历史沟通记录（时间/记录人/内容），支持录入新的沟通内容 |
+
+#### 数据库迁移
+
+```bash
+npx prisma migrate deploy   # 迁移文件：20260904180000_add_member_feedback
+```
+
 ## License
 
 仅供学习与内部使用。

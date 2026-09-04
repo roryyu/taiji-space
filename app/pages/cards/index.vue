@@ -379,7 +379,7 @@ onMounted(() => {
     </div>
 
     <!-- 列表 -->
-    <el-table v-loading="loading" :data="items" border stripe>
+    <el-table v-loading="loading" :data="items">
       <el-table-column prop="cardNo" label="卡号" min-width="170" />
       <el-table-column label="会员" min-width="120">
         <template #default="{ row }">{{ row.member?.name }}（{{ row.member?.phone }}）</template>
@@ -545,7 +545,7 @@ onMounted(() => {
 
     <!-- 流水对话框 -->
     <el-dialog v-model="txVisible" :title="`交易流水 - ${txCard?.cardNo ?? ''}`" width="560px">
-      <el-table v-loading="txLoading" :data="txItems" border size="small" max-height="400">
+      <el-table v-loading="txLoading" :data="txItems" size="small" max-height="400">
         <el-table-column label="类型" width="80">
           <template #default="{ row }">{{ TxTypeLabels[(row as TxRow).type] }}</template>
         </el-table-column>
@@ -576,7 +576,7 @@ onMounted(() => {
 
 .form-tip {
   margin-left: 8px;
-  color: #8c8c8c;
+  color: var(--ts-muted-foreground);
   font-size: 12px;
 }
 

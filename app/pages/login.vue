@@ -54,20 +54,18 @@ async function handleLogin() {
 <template>
   <div class="login-page">
     <div class="login-card">
-      <div class="login-title">
-        <span class="logo-icon">☯</span>
-        <h1>太极空间</h1>
-      </div>
-      <p class="login-subtitle">会员课程管理系统</p>
+      <div class="login-logo">☯</div>
+      <div class="login-title">太极空间</div>
+      <p class="login-subtitle">登录会员课程管理系统</p>
       <el-form @submit.prevent="handleLogin">
         <el-form-item>
-          <el-input v-model="form.username" placeholder="账号" size="large" />
+          <el-input v-model="form.username" placeholder="请输入账号" size="large" />
         </el-form-item>
         <el-form-item>
           <el-input
             v-model="form.password"
             type="password"
-            placeholder="密码"
+            placeholder="请输入密码"
             size="large"
             show-password
             @keyup.enter="handleLogin"
@@ -83,52 +81,69 @@ async function handleLogin() {
           登 录
         </el-button>
       </el-form>
+      <p class="login-footer">太极空间 · 会员全生命周期管理</p>
     </div>
   </div>
 </template>
 
 <style scoped>
+/* shadcn 风格登录页：中性灰渐变底 + 白卡片，1px 边框 + 柔和大阴影 */
 .login-page {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: linear-gradient(135deg, #001529 0%, #1677ff 100%);
+  background:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(37, 99, 235, 0.08), transparent),
+    linear-gradient(180deg, #fafafa 0%, #f4f4f5 100%);
 }
 
 .login-card {
-  width: 380px;
+  width: 400px;
   padding: 40px;
   background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--ts-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--ts-shadow-lg);
 }
 
-.login-title {
+.login-logo {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-}
-
-.login-title h1 {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 16px;
+  border-radius: var(--radius-lg);
+  background: var(--ts-primary);
+  color: #fff;
   font-size: 24px;
-  color: #262626;
-  margin: 0;
 }
 
-.logo-icon {
-  font-size: 28px;
+.login-title {
+  text-align: center;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ts-foreground);
 }
 
 .login-subtitle {
   text-align: center;
-  color: #8c8c8c;
-  margin: 8px 0 28px;
+  color: var(--ts-muted-foreground);
+  margin: 6px 0 28px;
   font-size: 14px;
 }
 
 .login-btn {
   width: 100%;
+  margin-top: 8px;
+}
+
+.login-footer {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 12px;
+  color: #a1a1aa;
 }
 </style>

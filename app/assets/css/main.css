@@ -1,4 +1,132 @@
-/* 全局样式初始化：消除浏览器默认样式差异（如 Chrome body margin:8px） */
+/*
+ * 全局样式与设计令牌
+ *
+ * 设计语言参考 shadcn/ui（github.com/shadcn-ui/ui）：
+ * - 语义化颜色令牌（background/foreground/primary/muted/border/ring...）
+ * - 统一圆角刻度（--radius 派生 sm/md/lg/xl）
+ * - 1px 边框优先于重阴影、flex + gap 间距、克制的中性灰配色
+ *
+ * 令牌先定义在 :root，再映射到 Element Plus 的 CSS 变量，
+ * 全站组件（按钮/输入框/表格/弹层）自动继承统一风格。
+ */
+
+/* ---------- 语义化设计令牌（shadcn/ui zinc 中性色，OKLCH → HEX 换算） ---------- */
+:root {
+  /* 圆角刻度：与 shadcn/ui 一致的派生规则 */
+  --radius: 0.625rem; /* lg 基准 10px */
+  --radius-sm: calc(var(--radius) * 0.6); /* 6px */
+  --radius-md: calc(var(--radius) * 0.8); /* 8px */
+  --radius-lg: var(--radius); /* 10px */
+  --radius-xl: calc(var(--radius) * 1.4); /* 14px */
+
+  /* 页面与文字 */
+  --ts-background: #ffffff; /* 页面底色（纯白） */
+  --ts-foreground: #18181b; /* zinc-900 主文字 */
+  --ts-muted: #f4f4f5; /* zinc-100 弱背景 */
+  --ts-muted-foreground: #6d6d71; /* 次要文字 */
+  --ts-border: #e7e7e9; /* 默认边框 */
+  --ts-input-border: #d9d9de; /* 表单控件边框 */
+  --ts-ring: #a3a3a8; /* 聚焦环 */
+
+  /* 品牌主色（太极·靛蓝，替代 EP 默认 #409eff） */
+  --ts-primary: #2563eb; /* blue-600 */
+  --ts-primary-hover: #1d4ed8; /* blue-700 */
+  --ts-primary-active: #1e40af; /* blue-800 */
+  --ts-primary-light: #eff6ff; /* blue-50 弱底 */
+  --ts-primary-foreground: #ffffff;
+
+  /* 状态色 */
+  --ts-success: #16a34a; /* green-600 */
+  --ts-success-light: #f0fdf4; /* green-50 */
+  --ts-warning: #d97706; /* amber-600 */
+  --ts-warning-light: #fffbeb; /* amber-50 */
+  --ts-danger: #dc2626; /* red-600 */
+  --ts-danger-light: #fef2f2; /* red-50 */
+  --ts-info: #71717a; /* zinc-500 */
+
+  /* 侧边栏令牌 */
+  --ts-sidebar: #fafafa; /* zinc-50 浅色侧栏 */
+  --ts-sidebar-foreground: #3f3f46; /* zinc-700 */
+  --ts-sidebar-accent: #eff6ff; /* 选中底色 */
+  --ts-sidebar-accent-foreground: #2563eb;
+
+  /* 阴影（克制：仅弹层与卡片悬浮时使用） */
+  --ts-shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.05);
+  --ts-shadow: 0 1px 3px rgba(24, 24, 27, 0.06), 0 1px 2px rgba(24, 24, 27, 0.04);
+  --ts-shadow-lg: 0 10px 30px -8px rgba(24, 24, 27, 0.16);
+}
+
+/* ---------- Element Plus 主题变量映射 ---------- */
+/* 注：EP 自身的 :root 变量声明在本文件之后注入，
+   此处用 html:root 提高优先级确保覆盖生效。 */
+html:root {
+  --el-color-primary: var(--ts-primary);
+  --el-color-primary-light-3: #60a5fa;
+  --el-color-primary-light-5: #93c5fd;
+  --el-color-primary-light-7: #bfdbfe;
+  --el-color-primary-light-8: #dbeafe;
+  --el-color-primary-light-9: var(--ts-primary-light);
+  --el-color-primary-dark-2: var(--ts-primary-active);
+
+  --el-color-success: var(--ts-success);
+  --el-color-warning: var(--ts-warning);
+  --el-color-danger: var(--ts-danger);
+  --el-color-error: var(--ts-danger);
+  --el-color-info: var(--ts-info);
+
+  --el-text-color-primary: var(--ts-foreground);
+  --el-text-color-regular: #3f3f46;
+  --el-text-color-secondary: var(--ts-muted-foreground);
+  --el-text-color-placeholder: #a1a1aa;
+
+  --el-border-color: var(--ts-input-border);
+  --el-border-color-light: var(--ts-border);
+  --el-border-color-lighter: var(--ts-border);
+  --el-border-color-extra-light: #f1f1f3;
+
+  --el-fill-color: var(--ts-muted);
+  --el-fill-color-light: var(--ts-muted);
+  --el-fill-color-lighter: #fafafa;
+  --el-fill-color-blank: #ffffff;
+
+  --el-bg-color: #ffffff;
+  --el-bg-color-page: #fafafa;
+
+  --el-border-radius-base: var(--radius-md);
+  --el-border-radius-small: var(--radius-sm);
+  --el-border-radius-round: 999px;
+
+  --el-font-family:
+    'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+
+  --el-box-shadow: var(--ts-shadow-lg);
+  --el-box-shadow-light: var(--ts-shadow);
+  --el-box-shadow-lighter: var(--ts-shadow-sm);
+
+  /* 聚焦环：与 shadcn/ui 一致的 ring 效果 */
+  --el-focus-ring-color: rgba(37, 99, 235, 0.12);
+
+  /* 输入类控件 */
+  --el-input-border-color: var(--ts-input-border);
+  --el-input-hover-border-color: var(--ts-ring);
+  --el-input-focus-border-color: var(--ts-primary);
+  --el-input-text-color: var(--ts-foreground);
+  --el-input-placeholder-color: #a1a1aa;
+  --el-input-border-radius: var(--radius-md);
+  --el-textarea-border-radius: var(--radius-md);
+
+  /* 卡片 / 对话框 / 标签 / 开关 */
+  --el-card-border-color: var(--ts-border);
+  --el-card-border-radius: var(--radius-xl);
+  --el-card-padding: 20px;
+  --el-dialog-border-radius: var(--radius-xl);
+  --el-tag-border-radius: var(--radius-sm);
+  --el-switch-on-color: var(--ts-primary);
+  --el-menu-item-height: 44px;
+}
+
+/* ---------- 全局基础样式 ---------- */
 
 /* 统一盒模型，避免 padding/border 撑大元素 */
 *,
@@ -22,13 +150,12 @@ body,
 }
 
 body {
-  /* 与 Element Plus 默认字体栈保持一致 */
   font-family:
     'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
     'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
   font-size: 14px;
-  color: #303133;
-  background-color: #f0f2f5;
+  color: var(--ts-foreground);
+  background-color: var(--ts-background);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -55,4 +182,95 @@ ol {
 a {
   text-decoration: none;
   color: inherit;
+}
+
+::selection {
+  background: var(--ts-primary);
+  color: var(--ts-primary-foreground);
+}
+
+/* ---------- Element Plus 组件精修（对齐 shadcn/ui 观感） ---------- */
+/* 注：@element-plus/nuxt 按需注入的组件样式在全局 CSS 之后，
+   此处选择器统一加 body 前缀提高优先级确保覆盖生效。 */
+
+/* 卡片：1px 边框 + 轻阴影替代默认描边，圆角放大 */
+body .el-card {
+  box-shadow: var(--ts-shadow-sm);
+}
+
+/* 按钮：更饱满的字重与过渡 */
+body .el-button {
+  font-weight: 500;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+/* 输入类控件：聚焦态叠加品牌色柔光环（shadcn ring 效果） */
+body .el-input__wrapper.is-focus,
+body .el-textarea__inner:focus {
+  box-shadow:
+    0 0 0 1px var(--ts-primary) inset,
+    0 0 0 4px var(--el-focus-ring-color);
+}
+
+/* 表格：去掉厚重感，仅保留行分隔线与表头弱底色 */
+body .el-table {
+  --el-table-border-color: var(--el-border-color-extra-light);
+  --el-table-header-bg-color: #fafafa;
+  --el-table-row-hover-bg-color: var(--ts-primary-light);
+  --el-table-header-text-color: var(--ts-foreground);
+  --el-table-text-color: #3f3f46;
+  font-size: 13.5px;
+}
+
+body .el-table th.el-table__cell {
+  font-weight: 600;
+}
+
+/* 对话框：头部间距与标题对齐 shadcn Dialog */
+body .el-dialog {
+  box-shadow: var(--ts-shadow-lg);
+}
+
+body .el-dialog__header {
+  padding: 20px 24px 12px;
+  margin-right: 0;
+}
+
+body .el-dialog__title {
+  font-weight: 600;
+}
+
+body .el-dialog__body {
+  padding: 12px 24px 20px;
+  color: #3f3f46;
+}
+
+body .el-dialog__footer {
+  padding: 12px 24px 20px;
+}
+
+/* 弹层浮层（下拉/日期/消息框）统一圆角 */
+body .el-popper,
+body .el-message-box,
+body .el-dropdown-menu {
+  border-radius: var(--radius-lg);
+}
+
+/* 标签：字重 */
+body .el-tag {
+  font-weight: 500;
+}
+
+/* 表单标签字重 */
+body .el-form-item__label {
+  font-weight: 500;
+  color: var(--ts-foreground);
+}
+
+/* 消息提示圆角 */
+body .el-message {
+  border-radius: var(--radius-lg);
 }

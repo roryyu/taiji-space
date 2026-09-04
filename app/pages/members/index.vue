@@ -227,7 +227,7 @@ onMounted(() => {
     </div>
 
     <!-- 列表 -->
-    <el-table v-loading="loading" :data="items" border stripe>
+    <el-table v-loading="loading" :data="items">
       <el-table-column prop="id" label="ID" width="60" />
       <el-table-column prop="name" label="顾客姓名" min-width="100" />
       <el-table-column prop="phone" label="手机号" width="130" />

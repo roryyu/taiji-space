@@ -84,9 +84,6 @@ async function handleLogout() {
         :collapse="collapsed"
         :collapse-transition="false"
         router
-        background-color="#001529"
-        text-color="rgba(255,255,255,0.65)"
-        active-text-color="#ffffff"
         class="admin-menu"
       >
         <el-menu-item v-for="m in menus" :key="m.path" :index="m.path">
@@ -137,8 +134,10 @@ async function handleLogout() {
   height: 100vh;
 }
 
+/* 浅色侧栏：shadcn Sidebar 风格（弱底色 + 1px 右边框） */
 .admin-aside {
-  background-color: #001529;
+  background-color: var(--ts-sidebar);
+  border-right: 1px solid var(--ts-border);
   transition: width 0.2s;
   overflow-x: hidden;
 }
@@ -149,22 +148,46 @@ async function handleLogout() {
   justify-content: center;
   gap: 8px;
   height: 56px;
-  color: #fff;
-  font-size: 17px;
+  color: var(--ts-foreground);
+  font-size: 16px;
   font-weight: 600;
   white-space: nowrap;
+  border-bottom: 1px solid var(--ts-border);
 }
 
 .logo-icon {
-  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-md);
+  background: var(--ts-primary);
+  color: #fff;
+  font-size: 16px;
 }
 
 .admin-menu {
   border-right: none;
+  padding: 8px;
+  background-color: transparent;
+}
+
+/* 菜单项：圆角化，选中态为品牌色弱底 + 品牌色文字 */
+.admin-menu :deep(.el-menu-item) {
+  border-radius: var(--radius-md);
+  margin-bottom: 2px;
+  font-weight: 500;
+  color: var(--ts-sidebar-foreground);
+}
+
+.admin-menu :deep(.el-menu-item:hover) {
+  background-color: var(--ts-muted);
 }
 
 .admin-menu :deep(.el-menu-item.is-active) {
-  background-color: #1677ff;
+  background-color: var(--ts-sidebar-accent);
+  color: var(--ts-sidebar-accent-foreground);
 }
 
 .admin-header {
@@ -173,7 +196,7 @@ async function handleLogout() {
   justify-content: space-between;
   height: 56px;
   background: #fff;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--ts-border);
 }
 
 .header-left {
@@ -183,9 +206,21 @@ async function handleLogout() {
 }
 
 .collapse-btn {
-  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  font-size: 16px;
   cursor: pointer;
-  color: #595959;
+  color: var(--ts-muted-foreground);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.collapse-btn:hover {
+  background: var(--ts-muted);
+  color: var(--ts-foreground);
 }
 
 .user-info {
@@ -194,21 +229,31 @@ async function handleLogout() {
   gap: 8px;
   cursor: pointer;
   outline: none;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  transition: background-color 0.15s ease;
+}
+
+.user-info:hover {
+  background: var(--ts-muted);
 }
 
 .user-avatar {
-  background: #1677ff;
-  font-size: 14px;
+  background: var(--ts-foreground);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .user-name {
   font-size: 14px;
-  color: #262626;
+  color: var(--ts-foreground);
+  font-weight: 500;
 }
 
 .admin-main {
-  background: #f5f5f5;
-  padding: 16px;
+  background: var(--ts-background);
+  padding: 24px;
   overflow-y: auto;
 }
 </style>

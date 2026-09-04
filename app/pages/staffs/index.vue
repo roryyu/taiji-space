@@ -141,7 +141,7 @@ onMounted(fetchList)
     </div>
 
     <!-- 列表 -->
-    <el-table v-loading="loading" :data="items" border stripe>
+    <el-table v-loading="loading" :data="items">
       <el-table-column prop="id" label="ID" width="60" />
       <el-table-column prop="name" label="姓名" width="120" />
       <el-table-column prop="account" label="账号" width="140" />

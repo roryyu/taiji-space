@@ -82,7 +82,7 @@ const maxTagCount = computed(() =>
 
       <!-- 员工分析 -->
       <el-tab-pane label="员工分析" name="teachers">
-        <el-table :data="staffData?.items ?? []" border>
+        <el-table :data="staffData?.items ?? []">
           <el-table-column prop="name" label="员工" width="120" />
           <el-table-column prop="scheduleTotal" label="总排期数" width="100" />
           <el-table-column prop="scheduleFinished" label="已完成排期" width="110" />
@@ -103,7 +103,7 @@ const maxTagCount = computed(() =>
 
       <!-- 课程分析 -->
       <el-tab-pane label="课程分析" name="courses">
-        <el-table :data="courseData?.items ?? []" border>
+        <el-table :data="courseData?.items ?? []">
           <el-table-column prop="name" label="课程" min-width="140" />
           <el-table-column prop="scheduleCount" label="排期场次" width="90" />
         </el-table>
@@ -120,7 +120,9 @@ const maxTagCount = computed(() =>
 }
 
 .analytics-grid h3 {
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ts-foreground);
   margin: 0 0 12px;
 }
 
@@ -135,7 +137,7 @@ const maxTagCount = computed(() =>
   width: 90px;
   text-align: right;
   font-size: 13px;
-  color: #595959;
+  color: #3f3f46;
 }
 
 .tag-bar {
@@ -145,6 +147,7 @@ const maxTagCount = computed(() =>
 .tag-count {
   width: 30px;
   font-size: 13px;
-  color: #8c8c8c;
+  color: var(--ts-muted-foreground);
+  font-variant-numeric: tabular-nums;
 }
 </style>

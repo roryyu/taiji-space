@@ -219,10 +219,10 @@ function formatTime(dateStr: string): string {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
-// 获取课程状态颜色
+// 获取课程状态颜色（未上课：品牌色弱底；已上课：成功色弱底）
 function getStatusColor(schedule: ScheduleItem | null): string {
   if (!schedule) return 'transparent'
-  return schedule.status === 'COMPLETED' ? 'rgba(103, 194, 58, 0.3)' : 'rgba(64, 158, 255, 0.3)'
+  return schedule.status === 'COMPLETED' ? 'rgba(22, 163, 74, 0.14)' : 'rgba(37, 99, 235, 0.12)'
 }
 
 // ---------- 初始化 ----------
@@ -328,11 +328,11 @@ function scrollToEightAM() {
     <!-- 图例 -->
     <div class="legend">
       <div class="legend-item">
-        <span class="legend-color" style="background-color: rgba(64, 158, 255, 0.3);"></span>
+        <span class="legend-color" style="background-color: rgba(37, 99, 235, 0.12);"></span>
         <span>未上课（点击确认）</span>
       </div>
       <div class="legend-item">
-        <span class="legend-color" style="background-color: rgba(103, 194, 58, 0.3);"></span>
+        <span class="legend-color" style="background-color: rgba(22, 163, 74, 0.14);"></span>
         <span>已上课</span>
       </div>
     </div>
@@ -343,8 +343,9 @@ function scrollToEightAM() {
 .calendar-container {
   padding: 20px;
   background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--ts-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--ts-shadow-sm);
 }
 
 .calendar-header {
@@ -383,13 +384,13 @@ function scrollToEightAM() {
 
 .teacher-name {
   font-weight: 600;
-  color: #409eff;
+  color: var(--ts-primary);
   font-size: 14px;
 }
 
 .date-range {
   font-size: 14px;
-  color: #606266;
+  color: var(--ts-muted-foreground);
 }
 
 .calendar-table-wrapper {
@@ -403,7 +404,7 @@ function scrollToEightAM() {
   position: sticky;
   top: 0;
   z-index: 10;
-  background-color: #f5f7fa;
+  background-color: #fafafa;
 }
 
 .calendar-table {
@@ -414,20 +415,20 @@ function scrollToEightAM() {
 
 .calendar-table th,
 .calendar-table td {
-  border: 1px solid #ebeef5;
+  border: 1px solid var(--el-border-color-extra-light);
   padding: 0;
 }
 
 .time-header {
   width: 70px;
-  background-color: #f5f7fa;
+  background-color: #fafafa;
   font-weight: 600;
   text-align: center;
   padding: 10px 0;
 }
 
 .day-header {
-  background-color: #f5f7fa;
+  background-color: #fafafa;
   text-align: center;
   padding: 10px 0;
   min-width: 120px;
@@ -449,15 +450,15 @@ function scrollToEightAM() {
 }
 
 .day-date.is-today {
-  background-color: #409eff;
+  background-color: var(--ts-primary);
   color: #fff;
 }
 
 .time-cell {
-  background-color: #f5f7fa;
+  background-color: #fafafa;
   text-align: center;
   font-size: 12px;
-  color: #909399;
+  color: var(--ts-muted-foreground);
   padding: 8px 4px;
   vertical-align: top;
 }
@@ -485,8 +486,8 @@ function scrollToEightAM() {
 .schedule-info {
   font-size: 12px;
   line-height: 1.4;
-  padding: 4px;
-  border-radius: 4px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
   height: 100%;
   overflow: hidden;
 }
@@ -502,11 +503,11 @@ function scrollToEightAM() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: #606266;
+  color: var(--ts-sidebar-foreground);
 }
 
 .time-range {
-  color: #909399;
+  color: var(--ts-muted-foreground);
   font-size: 11px;
   margin-top: 2px;
 }
@@ -515,17 +516,18 @@ function scrollToEightAM() {
   display: inline-block;
   font-size: 10px;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   margin-top: 4px;
+  font-weight: 500;
 }
 
 .status-badge.completed {
-  background-color: #67c23a;
+  background-color: var(--ts-success);
   color: #fff;
 }
 
 .status-badge.pending {
-  background-color: #409eff;
+  background-color: var(--ts-primary);
   color: #fff;
 }
 
@@ -540,13 +542,13 @@ function scrollToEightAM() {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
-  color: #606266;
+  font-size: 13px;
+  color: var(--ts-muted-foreground);
 }
 
 .legend-color {
   width: 16px;
   height: 16px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 </style>
