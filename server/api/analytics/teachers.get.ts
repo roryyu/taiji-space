@@ -7,7 +7,7 @@ export default defineEventHandler(async () => {
     orderBy: { id: 'asc' },
   })
 
-  const items = staff.map((t) => ({
+  const items = teachers.map((t) => ({
     staffId: t.id,
     name: t.name,
     scheduleTotal: 0,
