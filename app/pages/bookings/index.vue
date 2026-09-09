@@ -1,6 +1,8 @@
 <!-- 课程预约：基于会员卡展示预约情况，支持批量设置排期 -->
 <script setup lang="ts">
 import { ElMessage } from 'element-plus'
+import { MagicStick } from '@element-plus/icons-vue'
+import { marked } from 'marked'
 
 
 interface CardRow {
@@ -123,6 +125,12 @@ const feedbackItems = ref<FeedbackItem[]>([])
 const loadingFeedback = ref(false)
 const feedbackContent = ref('')
 const feedbackSaving = ref(false)
+const aiSuggesting = ref(false)
+const aiSuggestion = ref('')
+
+const renderedAiSuggestion = computed(() => {
+  return aiSuggestion.value ? marked.parse(aiSuggestion.value, { async: false }) as string : ''
+})
 
 /** 拉取某会员的历史沟通反馈 */
 async function fetchFeedbacks(memberId: number) {
@@ -144,8 +152,26 @@ async function fetchFeedbacks(memberId: number) {
 function openFeedbackDialog(card: CardRow) {
   feedbackCard.value = card
   feedbackContent.value = ''
+  aiSuggestion.value = ''
   feedbackVisible.value = true
   fetchFeedbacks(card.memberId)
+}
+
+/** 获取 AI 沟通策略建议（一次性，不保存） */
+async function handleAiSuggest() {
+  if (!feedbackCard.value) return
+  aiSuggesting.value = true
+  try {
+    const res = await request<{ suggestion: string }>('/api/feedbacks/suggest', {
+      method: 'POST',
+      body: { memberId: feedbackCard.value.memberId },
+    })
+    aiSuggestion.value = res.suggestion
+  }
+  catch { /* 已统一提示 */ }
+  finally {
+    aiSuggesting.value = false
+  }
 }
 
 /** 保存沟通内容（预约上课？为什么不来上课？近况等） */
@@ -522,7 +548,30 @@ onMounted(fetchList)
 
       <!-- 历史沟通记录 -->
       <div class="feedback-history">
-        <h4>历史沟通记录</h4>
+        <div class="feedback-history-header">
+          <h4>历史沟通记录</h4>
+          <el-button
+            type="warning"
+            size="small"
+            :loading="aiSuggesting"
+            :disabled="aiSuggesting"
+            @click="handleAiSuggest"
+          >
+            <el-icon class="mr-1"><MagicStick /></el-icon>
+            AI 建议
+          </el-button>
+        </div>
+
+        <!-- AI 建议结果（一次性展示，不保存） -->
+        <el-alert
+          v-if="aiSuggestion"
+          type="info"
+          :closable="true"
+          class="ai-suggestion"
+        >
+          <div class="markdown-body" v-html="renderedAiSuggestion" />
+        </el-alert>
+
         <div v-loading="loadingFeedback">
           <div v-if="feedbackItems.length" class="feedback-list">
             <div v-for="item in feedbackItems" :key="item.id" class="feedback-item">
@@ -571,6 +620,10 @@ onMounted(fetchList)
   margin-left: 8px;
 }
 
+.mr-1 {
+  margin-right: 4px;
+}
+
 .text-gray-500 {
   color: var(--ts-muted-foreground);
 }
@@ -606,7 +659,62 @@ onMounted(fetchList)
   font-size: 14px;
   font-weight: 600;
   color: var(--ts-foreground);
+  margin: 0;
+}
+
+.feedback-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 12px;
+}
+
+.ai-suggestion {
+  margin-bottom: 16px;
+  line-height: 1.6;
+}
+
+.ai-suggestion :deep(.el-alert__content) {
+  flex: 1;
+}
+
+.markdown-body {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ts-foreground);
+}
+
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3),
+.markdown-body :deep(h4) {
+  margin: 12px 0 8px;
+  font-weight: 600;
+  color: var(--ts-foreground);
+}
+
+.markdown-body :deep(p) {
+  margin: 8px 0;
+}
+
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  margin: 8px 0;
+}
+
+.markdown-body :deep(li) {
+  margin: 4px 0;
+}
+
+.markdown-body :deep(strong) {
+  font-weight: 600;
+}
+
+.markdown-body :deep(code) {
+  padding: 2px 4px;
+  background: var(--ts-muted);
+  border-radius: 4px;
+  font-family: monospace;
 }
 
 .feedback-list {
