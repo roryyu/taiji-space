@@ -1,5 +1,7 @@
-// 种子数据脚本：初始化管理员账号与演示数据
+// 种子数据脚本：初始化管理员账号与业务主数据（门店/教练/课程/系统参数）
+// 数据来源：客资中心_用户信息.csv（门店列、备注中带课教练、留资来源详情中的团购商品）
 // 运行方式：npx prisma db seed（或 npm run db:seed）
+// 说明：全部按业务唯一键幂等写入，重复执行不会覆盖已修改的数据；暂不初始化 Member / MembershipCard
 import 'dotenv/config'
 import { randomBytes } from 'node:crypto'
 import bcrypt from 'bcryptjs'
@@ -16,6 +18,50 @@ const dbUrl = process.env.DATABASE_URL
 const schema = new URL(dbUrl).searchParams.get('schema') ?? undefined
 const adapter = new PrismaPg({ connectionString: dbUrl }, { schema })
 const prisma = new PrismaClient({ adapter })
+
+// ---------- 主数据（来源：客资中心_用户信息.csv） ----------
+
+// 门店：CSV「门店」列去重，名称与客资导出保持完全一致，便于后续按名称匹配
+const storeSeed = [
+  { name: '叁时柒太极空间-徐汇西岸馆', address: '上海市徐汇区（西岸馆）', businessHours: '09:00-21:00' },
+  { name: '叁时柒太极空间-杨高南路馆', address: '上海市浦东新区（杨高南路馆）', businessHours: '09:00-21:00' },
+  { name: '叁时柒太极空间-四川北路馆', address: '上海市虹口区（四川北路馆）', businessHours: '09:00-21:00' },
+] as const
+
+// 教练：CSV「备注」中出现的带课教练
+// 云淑：太极剑/器械体验带教（朱成月太极剑、筱姽剑花体验、落颜双人体验）
+// 资明：太极拳/青少年体验带教（张小姐太极、侯女士小孩三年级体验）
+// 若兰：太极拳体验带教（康小姐太极）
+const teacherSeed = [
+  { name: '云淑', account: 'yunshu', qualification: null, styleTags: ['太极剑', '太极扇', '器械'] },
+  { name: '资明', account: 'ziming', qualification: null, styleTags: ['太极拳', '青少年'] },
+  { name: '若兰', account: 'ruolan', qualification: null, styleTags: ['太极拳', '养生'] },
+] as const
+
+// 课程：CSV「留资来源详情」中的团购商品拆分而来
+// ①【中式养生】专业太极拳1对1｜零基础｜心肺减肥防摔
+// ②【学技能】太极剑｜太极扇｜逍遥扇｜潮太极1对1体验
+// ③【道家八段锦】0基础私教｜焦虑抑郁｜气血｜脏腑调理
+// ④【长寿功｜金刚功｜易筋经｜五禽戏｜8次卡】私教课
+const courseSeed = [
+  { name: '专业太极拳1对1', description: '中式养生系列，零基础可学，侧重心肺锻炼、减肥与防摔。' },
+  { name: '太极剑1对1', description: '学技能系列 1对1 体验课，含太极剑剑法基础与剑花教学。' },
+  { name: '太极扇1对1', description: '学技能系列 1对1 体验课，太极扇套路教学。' },
+  { name: '逍遥扇1对1', description: '学技能系列 1对1 体验课，逍遥扇套路教学。' },
+  { name: '潮太极1对1', description: '学技能系列 1对1 体验课，年轻化潮太极教学。' },
+  { name: '道家八段锦私教', description: '0基础私教，侧重焦虑抑郁调理、气血与脏腑调理。' },
+  { name: '长寿功私教', description: '传统养生功私教课（长寿功/金刚功/易筋经/五禽戏 8次卡系列）。' },
+  { name: '金刚功私教', description: '传统养生功私教课（长寿功/金刚功/易筋经/五禽戏 8次卡系列）。' },
+  { name: '易筋经私教', description: '传统养生功私教课（长寿功/金刚功/易筋经/五禽戏 8次卡系列）。' },
+  { name: '五禽戏私教', description: '传统养生功私教课（长寿功/金刚功/易筋经/五禽戏 8次卡系列）。' },
+] as const
+
+// 系统参数
+const systemParamSeed = [
+  { key: 'booking.cancel.deadline.hours', value: '2', description: '开课前可取消预约的小时数' },
+  { key: 'card.expire.remind.days', value: '30', description: '会员卡到期提醒提前天数' },
+  { key: 'site.name', value: '太极空间', description: '系统显示名称' },
+] as const
 
 async function main() {
   // 1. 初始管理员账号：写入 Staff 表（type: ADMINISTRATOR）
@@ -36,146 +82,63 @@ async function main() {
     }
   }
 
-  // 2. 演示数据：生产环境默认跳过，设置 SEED_DEMO=1 可强制初始化（管理员账号不受该开关限制）
-  const seedDemo = process.env.NODE_ENV !== 'production' || process.env.SEED_DEMO === '1'
-  if (!seedDemo) {
-    console.log('生产环境：已跳过演示数据（如需初始化可设置 SEED_DEMO=1 重新执行）')
-  } else {
-    // 整段演示数据放入单个事务，任一步失败整体回滚，避免残留脏数据
-    await prisma.$transaction(async (tx) => {
-      // 幂等控制：事务内判断，已有店铺数据则跳过演示数据
-      if ((await tx.store.count()) > 0) {
-        console.log('演示数据已存在，跳过')
-        return
-      }
+  // 2. 业务主数据：整段放入单个事务，任一步失败整体回滚；按唯一键幂等，可重复执行
+  const staffPassword = process.env.SEED_STAFF_PASSWORD || '123456'
+  const staffPasswordHash = await bcrypt.hash(staffPassword, 10)
 
-      // 2.1 店铺
-      const [store1, store2] = await Promise.all([
-        tx.store.create({
-          data: { name: '太极空间·望京店', address: '北京市朝阳区望京 SOHO T1 12 层', businessHours: '09:00-21:00', staffId: null },
-        }),
-        tx.store.create({
-          data: { name: '太极空间·国贸店', address: '北京市朝阳区建国门外大街 1 号', businessHours: '10:00-22:00', staffId: null },
-        }),
-      ])
-
-      // 2.2 教师（Staff）
-      const hashedPassword = await bcrypt.hash('123456', 10)
-      const [s1, s2, s3] = await Promise.all([
-        tx.staff.create({
-          data: { name: '陈静云', qualification: '陈氏太极拳第十二代传人', styleTags: ['陈氏太极', '推手', '器械'], account: 'chenjingyun', password: hashedPassword, type: 'TEACHER' },
-        }),
-        tx.staff.create({
-          data: { name: '杨明德', qualification: '杨氏太极拳嫡传弟子', styleTags: ['杨氏太极', '养生', '慢架'], account: 'yangmingde', password: hashedPassword, type: 'TEACHER' },
-        }),
-        tx.staff.create({
-          data: { name: '吴若兰', qualification: '国家武术套路冠军', styleTags: ['太极剑', '基本功', '青少年'], account: 'wuruolan', password: hashedPassword, type: 'TEACHER' },
-        }),
-      ])
-
-      // 2.3 会员
-      const memberSeed = [
-        { name: '张伟', phone: '13800000001', channel: 'REFERRAL', preferenceTags: ['陈氏太极', '推手'], remark: '膝盖旧伤，注意强度' },
-        { name: '李娜', phone: '13800000002', channel: 'ONLINE', preferenceTags: ['养生', '慢架'], remark: null },
-        { name: '王强', phone: '13800000003', channel: 'WALK_IN', preferenceTags: ['器械', '太极剑'], remark: '偏好晚间课程' },
-        { name: '赵敏', phone: '13800000004', channel: 'ACTIVITY', preferenceTags: ['基本功'], remark: null },
-        { name: '刘洋', phone: '13800000005', channel: 'REFERRAL', preferenceTags: ['青少年', '基本功'], remark: '学生会员' },
-      ] as const
-      const members = []
-      for (const m of memberSeed) {
-        members.push(await tx.member.create({ data: { ...m, preferenceTags: [...m.preferenceTags] } }))
-      }
-
-      // 2.4 课程（先于会员卡创建，因为卡需要关联课程）
-      const [c1, c2, c3] = await Promise.all([
-        tx.course.create({
-          data: { name: '陈氏太极拳老架一路', description: '传统陈氏老架一路 74 式，适合有一定基础的学员系统研习。' },
-        }),
-        tx.course.create({
-          data: { name: '杨氏太极养生班', description: '以杨氏 24 式为核心的养生课程，节奏舒缓，适合零基础。' },
-        }),
-        tx.course.create({
-          data: { name: '太极剑入门', description: '32 式太极剑入门，包含剑法基础与套路分解教学。' },
-        }),
-      ])
-
-      // 2.5 会员卡
-      const now = new Date()
-      const yearLater = new Date(now.getTime() + 365 * 24 * 3600 * 1000)
-      const cardSeed = [
-        { memberId: members[0]!.id, storeId: store1.id, courseId: c1.id, coachId: s1.id, totalAmount: 3000, totalSessions: 30, giftSessions: 5 },
-        { memberId: members[1]!.id, storeId: store1.id, courseId: c2.id, coachId: s2.id, totalAmount: 1500, totalSessions: 20, giftSessions: 3 },
-        { memberId: members[2]!.id, storeId: store2.id, courseId: c3.id, coachId: s3.id, totalAmount: 2000, totalSessions: 24, giftSessions: 4 },
-        { memberId: members[3]!.id, storeId: store1.id, courseId: c1.id, coachId: s1.id, totalAmount: 1000, totalSessions: 10, giftSessions: 2 },
-      ] as const
-      for (const [i, c] of cardSeed.entries()) {
-        const card = await tx.membershipCard.create({
-          data: {
-            cardNo: `TJ${Date.now()}${String(i).padStart(2, '0')}`,
-            memberId: c.memberId,
-            storeId: c.storeId,
-            courseId: c.courseId,
-            coachId: c.coachId,
-            totalAmount: c.totalAmount,
-            totalSessions: c.totalSessions,
-            giftSessions: c.giftSessions,
-            validFrom: now,
-            validTo: yearLater,
-          },
-        })
-        await tx.cardTransaction.create({
-          data: { cardId: card.id, type: 'RECHARGE', amount: c.totalAmount, remark: '开卡充值' },
-        })
-      }
-
-      // 2.6 排期（关联到会员卡和会员）
-      const day = 24 * 3600 * 1000
-      const at = (offsetDays: number, hour: number) => {
-        const d = new Date(now.getTime() + offsetDays * day)
-        d.setHours(hour, 0, 0, 0)
-        return d
-      }
-
-      // 获取会员卡信息用于关联排期
-      const cards = await tx.membershipCard.findMany({
-        where: { memberId: { in: members.slice(0, 4).map(m => m.id) } },
-        select: { id: true, memberId: true, courseId: true },
+  const result = await prisma.$transaction(async (tx) => {
+    // 2.1 门店（按名称唯一键 upsert，已存在则保留原值）
+    let storeCreated = 0
+    for (const store of storeSeed) {
+      const before = await tx.store.findUnique({ where: { name: store.name }, select: { id: true } })
+      await tx.store.upsert({
+        where: { name: store.name },
+        update: {},
+        create: { ...store, staffId: null },
       })
+      if (!before) storeCreated++
+    }
 
-      if (cards.length >= 4) {
-        // 为每个会员卡创建排期
-        await tx.courseSchedule.createMany({
-          data: [
-            { cardId: cards[0]!.id, memberId: cards[0]!.memberId, courseId: cards[0]!.courseId, startTime: at(-7, 10), endTime: at(-7, 11) },
-            { cardId: cards[0]!.id, memberId: cards[0]!.memberId, courseId: cards[0]!.courseId, startTime: at(-3, 19), endTime: at(-3, 20) },
-            { cardId: cards[1]!.id, memberId: cards[1]!.memberId, courseId: cards[1]!.courseId, startTime: at(2, 10), endTime: at(2, 11) },
-            { cardId: cards[2]!.id, memberId: cards[2]!.memberId, courseId: cards[2]!.courseId, startTime: at(3, 15), endTime: at(3, 16) },
-          ],
-        })
+    // 2.2 教练（按登录账号唯一键 upsert）
+    let teacherCreated = 0
+    for (const teacher of teacherSeed) {
+      const before = await tx.staff.findUnique({ where: { account: teacher.account }, select: { id: true } })
+      await tx.staff.upsert({
+        where: { account: teacher.account },
+        update: {},
+        create: {
+          name: teacher.name,
+          account: teacher.account,
+          password: staffPasswordHash,
+          qualification: teacher.qualification,
+          styleTags: [...teacher.styleTags],
+          type: 'TEACHER',
+        },
+      })
+      if (!before) teacherCreated++
+    }
+
+    // 2.3 课程（Course 无名称唯一约束，先按名称查重再创建）
+    let courseCreated = 0
+    for (const course of courseSeed) {
+      const exists = await tx.course.findFirst({ where: { name: course.name }, select: { id: true } })
+      if (!exists) {
+        await tx.course.create({ data: { ...course } })
+        courseCreated++
       }
+    }
 
-      // 2.7 课程评价
-      await tx.courseReview.createMany({
-        data: [
-          { memberId: members[0]!.id, courseId: c1.id, rating: 5, suggestion: '陈老师讲解细致，希望增加推手环节。' },
-          { memberId: members[1]!.id, courseId: c1.id, rating: 4, suggestion: '节奏稍快，建议基础动作多复习。' },
-          { memberId: members[1]!.id, courseId: c2.id, rating: 5, suggestion: '非常放松，适合下班后练习。' },
-        ],
-      })
+    // 2.4 系统参数
+    await tx.systemParam.createMany({ data: [...systemParamSeed], skipDuplicates: true })
 
-      // 2.9 系统参数
-      await tx.systemParam.createMany({
-        data: [
-          { key: 'booking.cancel.deadline.hours', value: '2', description: '开课前可取消预约的小时数' },
-          { key: 'card.expire.remind.days', value: '30', description: '会员卡到期提醒提前天数' },
-          { key: 'site.name', value: '太极空间', description: '系统显示名称' },
-        ],
-        skipDuplicates: true,
-      })
-    })
-  }
+    return { storeCreated, teacherCreated, courseCreated }
+  })
 
-  console.log('种子数据初始化完成')
+  console.log(
+    `主数据初始化完成：门店新建 ${result.storeCreated} 家（共 ${storeSeed.length} 家），` +
+      `教练新建 ${result.teacherCreated} 人（初始密码：${process.env.SEED_STAFF_PASSWORD ? '已按环境变量 SEED_STAFF_PASSWORD 指定' : '123456'}），` +
+      `课程新建 ${result.courseCreated} 门（共 ${courseSeed.length} 门）`,
+  )
 }
 
 main()
